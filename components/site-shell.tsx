@@ -6,6 +6,7 @@ export const navItems = [
   { href: "/resultaten", label: "Resultaten" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/tarieven", label: "Tarieven" },
+  { href: "/abonnement", label: "Abonnement" },
   { href: "/contact", label: "Contact" },
 ];
 
