@@ -18,7 +18,7 @@ const source = await readFile(path.join(root, "lib", "agreement.ts"), "utf8");
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText;
 const agreementModuleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
 const {
-  agreement, subscriptions, subscriptionStrategy, subscriptionVersion,
+  agreement, generalTerms, subscriptions, subscriptionStrategy, subscriptionVersion,
   subscriptionConsent, subscriptionTerms, formatAgreementTime, normalizePostcode, formatSubscriptionAmount, validateAgreement,
 } = await import(agreementModuleUrl);
 const handlerSource = await readFile(path.join(root, "functions", "api", "overeenkomst.ts"), "utf8");
@@ -48,6 +48,8 @@ const validInput = {
   strategy: subscriptionStrategy,
   ...subscriptions[4],
   accepted: true,
+  generalTermsAccepted: true,
+  generalTermsId: generalTerms.id,
   subscriptionAccepted: true,
   subscriptionConsentText: subscriptionConsent(subscriptions[4]),
   subscriptionVersion,
@@ -62,6 +64,7 @@ test("validation requires explicit consent, current document and valid fields", 
   for (const accepted of [false, undefined, "true", "on", 1, null]) {
     assert.equal(validateAgreement({ ...validInput, accepted }).valid, false);
     assert.equal(validateAgreement({ ...validInput, subscriptionAccepted: accepted }).valid, false);
+    assert.equal(validateAgreement({ ...validInput, generalTermsAccepted: accepted }).valid, false);
   }
   for (const fields of [
     { firstName: "  " }, { lastName: "" }, { firstName: "a".repeat(81) },
@@ -76,6 +79,7 @@ test("validation requires explicit consent, current document and valid fields", 
     { strategy: "unknown" }, { agreementId: "old-version" },
     { agreementId: "copy-trading-v1-2026-10-18" },
     { agreementId: "copy-trading-v1.0-2026-09-01" },
+    { generalTermsId: undefined }, { generalTermsId: "old" },
   ]) {
     assert.equal(validateAgreement({ ...validInput, ...fields }).valid, false);
   }
@@ -138,6 +142,10 @@ test("account migration preserves historical evidence and confirmation sequence"
     const current = db.prepare("SELECT mexem_account_number, confirmation_number FROM agreement_acceptances WHERE id = 'new'").get();
     assert.equal(current.mexem_account_number, null);
     assert.equal(current.confirmation_number, "RUITAB-2026-002");
+    db.exec(await readFile(path.join(root, "migrations", "0006_general_terms_acceptance.sql"), "utf8"));
+    const historical = db.prepare("SELECT general_terms_accepted, general_terms_consent_text FROM agreement_acceptances WHERE id = 'historical'").get();
+    assert.equal(historical.general_terms_accepted, null);
+    assert.equal(historical.general_terms_consent_text, null);
   } finally {
     db.close();
   }
@@ -208,6 +216,9 @@ test("built HTML has exact robots directive and no discoverable links or sitemap
   assert.doesNotMatch(html, /Het document opent in een nieuw tabblad/);
   assert.match(html, /U hoeft deze koppeling niet opnieuw uit te voeren/);
   assert.ok(html.includes(agreement.consentText));
+  assert.match(html, /<input(?=[^>]*name="generalTermsAccepted")(?=[^>]*required)[^>]*>/);
+  assert.match(html, /href="\/algemene-voorwaarden"[^>]*target="_blank"/);
+  assert.equal(generalTerms.consentText, "Ik heb de Algemene Voorwaarden MakeMoreMoney gelezen en ga hiermee akkoord.");
   assert.doesNotMatch(html, /Beleggingsrekening|MEXEM-rekeningnummer|name="accountNumber"/);
   assert.doesNotMatch(html, /<p[^>]*>Versie /);
   assert.ok(!html.includes(subscriptionTerms));
@@ -287,6 +298,9 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       document_date: "17-10-2026",
       consent_text: "Exact opgeslagen eerste akkoord.",
       subscription_consent_text: "Exact opgeslagen tweede akkoord met voorwaarden.",
+      general_terms_name: "Opgeslagen algemene voorwaarden",
+      general_terms_version: "stored-terms-version",
+      general_terms_date: "stored-terms-date",
       accepted_at: "2026-10-18T11:00:00.000Z",
     };
     context.mock.method(nodemailer, "createTransport", (options) => {
@@ -323,6 +337,7 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
         `Beste ${snapshot.first_name},`, snapshot.strategy_label, snapshot.confirmation_number,
         snapshot.full_name, snapshot.company_name, "Spui 68A", "2511 BT 's-Gravenhage", snapshot.country,
         snapshot.document_name, snapshot.notes,
+        `U heeft ook akkoord gegeven op de ${snapshot.general_terms_name}, versie ${snapshot.general_terms_version} van ${snapshot.general_terms_date}.`,
         "Aantal posities: 3", "€ 25.500", "€ 51 per maand", "€ 153 per drie maanden",
         "18-10-2026 om 13:00", subscriptionTerms, "Met vriendelijke groet,",
       ]) assert.ok(message.text.includes(text), `Missing stored mail content: ${text}`);
@@ -452,6 +467,10 @@ test("Cloudflare Function stores real D1 records and rejects invalid or unavaila
     assert.equal((await post({ ...validInput, accepted: "true" })).status, 400);
     assert.equal((await post({ ...validInput, subscriptionAccepted: false })).status, 400);
     assert.equal((await post({ ...validInput, subscriptionAccepted: "true" })).status, 400);
+    for (const generalTermsAccepted of [false, undefined, "true", "on", 1, null]) {
+      assert.equal((await post({ ...validInput, generalTermsAccepted })).status, 400);
+    }
+    assert.equal((await post({ ...validInput, generalTermsId: "old" })).status, 400);
     assert.equal((await post({ ...validInput, email: "invalid" })).status, 400);
     assert.equal((await post({ ...validInput, positions: 21 })).status, 400);
     assert.equal((await post({ ...validInput, monthly: 1 })).status, 400);
@@ -500,6 +519,11 @@ test("Cloudflare Function stores real D1 records and rejects invalid or unavaila
       subscription_consent_text: validInput.subscriptionConsentText,
       subscription_accepted: 1,
       subscription_version: subscriptionVersion,
+      general_terms_name: generalTerms.name,
+      general_terms_version: generalTerms.version,
+      general_terms_date: generalTerms.date,
+      general_terms_consent_text: generalTerms.consentText,
+      general_terms_accepted: 1,
       notification_status: "not_configured",
       notification_updated_at: undefined,
       initials: validInput.initials,

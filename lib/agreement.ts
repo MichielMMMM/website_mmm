@@ -8,6 +8,15 @@ export const agreement = {
     "Ik heb de Copy Trading Raamovereenkomst MakeMoreMoney gelezen en ga hiermee akkoord.",
 } as const;
 
+export const generalTerms = {
+  id: "general-terms-v1.0-2026-09-01",
+  name: "Algemene Voorwaarden MakeMoreMoney",
+  version: "1.0",
+  date: "1-9-2026",
+  path: "/algemene-voorwaarden",
+  consentText: "Ik heb de Algemene Voorwaarden MakeMoreMoney gelezen en ga hiermee akkoord.",
+} as const;
+
 export const subscriptionStrategy = "Premie Collector Plus – volgsysteem";
 export const subscriptionVersion = "existing-customers-2026-10-18-v2";
 export const subscriptionTerms = "Het abonnement wordt per drie maanden vooruitbetaald en daarna telkens automatisch met drie maanden verlengd. Opzeggen kan tot uiterlijk één maand vóór de eerstvolgende verlengingsdatum.";
@@ -84,6 +93,8 @@ export type AgreementInput = {
   monthly: number;
   quarterly: number;
   accepted: boolean;
+  generalTermsAccepted: boolean;
+  generalTermsId: string;
   subscriptionAccepted: boolean;
   subscriptionConsentText: string;
   subscriptionVersion: string;
@@ -103,6 +114,13 @@ export function validateAgreement(value: unknown):
 
   if (!("subscriptionAccepted" in value) || value.subscriptionAccepted !== true) {
     return { valid: false, message: "U moet uw abonnementskeuze expliciet bevestigen." };
+  }
+
+  if (!("generalTermsAccepted" in value) || value.generalTermsAccepted !== true) {
+    return { valid: false, message: "U moet de algemene voorwaarden expliciet accepteren." };
+  }
+  if (!("generalTermsId" in value) || value.generalTermsId !== generalTerms.id) {
+    return { valid: false, message: "De algemene voorwaarden zijn gewijzigd. Vernieuw de pagina en lees de huidige versie." };
   }
 
   if (!("agreementId" in value) || value.agreementId !== agreement.id) {
@@ -207,6 +225,8 @@ export function validateAgreement(value: unknown):
       strategy: subscriptionStrategy,
       ...subscription,
       accepted: true,
+      generalTermsAccepted: true,
+      generalTermsId: generalTerms.id,
       subscriptionAccepted: true,
       subscriptionConsentText: value.subscriptionConsentText,
       subscriptionVersion,

@@ -110,6 +110,9 @@ Het formulier verifieert niet de identiteit of het bestaande klant-/rekeningbezi
    Deze migratie kopieert alle bestaande gegevens naar dezelfde tabelstructuur
    met een nullable historisch rekeningnummer en herstelt de index en nummertrigger.
    De jaarteller blijft behouden. Nieuwe registraties verzamelen geen rekeningnummer.
+   Voer `migrations/0006_general_terms_acceptance.sql` eenmaal uit voor deployment
+   van de verplichte algemene-voorwaardencheckbox. Bestaande registraties houden
+   NULL in deze velden: hiervoor wordt geen akkoord achteraf aangenomen.
 4. Koppel bij **Workers & Pages > website-mmm > Settings > Bindings** een
    D1-database met bindingsnaam **AGREEMENTS_DB**. Koppel preview aan een aparte
    testdatabase als previews moeten kunnen registreren; gebruik daar niet de
@@ -124,12 +127,15 @@ Het formulier verifieert niet de identiteit of het bestaande klant-/rekeningbezi
 Inzendingen worden in D1-tabel `agreement_acceptances` opgeslagen. Elke rij bevat
 een UUID, naam, e-mailadres, vaste strategie
 "Premie Collector Plus – volgsysteem", aantal posities, indicatief kapitaal,
-maand- en driemaandstarief, documentnaam, versie, datum, beide exacte checkboxteksten,
-twee expliciete akkoorden, abonnementsversie en het servertijdstip
+maand- en driemaandstarief, documentnaam, versie, datum, drie exacte checkboxteksten,
+drie expliciete akkoorden, abonnementsversie en het servertijdstip
 in UTC. De browser toont dit tijdstip in Europe/Amsterdam. Succes verschijnt
 uitsluitend na een bevestigde database-insert. Er wordt geen naam, rekeningnummer,
 IP-adres of user-agent naar applicatielogs geschreven of via de URL verstuurd.
 Er is geen publieke API voor het uitlezen van akkoorden.
+Het algemene-voorwaardenakkoord is verplicht in browser en API. Naam, versie,
+datum en exacte akkoordtekst worden bij dezelfde registratie met hetzelfde
+UTC-tijdstip opgeslagen. De bevestigingsmail gebruikt de opgeslagen versie en datum.
 
 Nieuwe registraties bewaren voorletters, voornaam en achternaam afzonderlijk, met een
 samengestelde volledige naam (zonder dubbele spaties), optionele bedrijfsnaam en

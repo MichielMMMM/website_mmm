@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
-  agreement, formatAgreementTime, formatSubscriptionAmount, normalizePostcode, positionLabel, subscriptions,
+  agreement, generalTerms, formatAgreementTime, formatSubscriptionAmount, normalizePostcode, positionLabel, subscriptions,
   subscriptionConsent, subscriptionStrategy, subscriptionVersion, validateAgreement,
 } from "@/lib/agreement";
 
@@ -16,6 +16,7 @@ export function AgreementForm() {
   const [available, setAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [accepted, setAccepted] = useState(false);
+  const [generalTermsAccepted, setGeneralTermsAccepted] = useState(false);
   const [subscriptionAccepted, setSubscriptionAccepted] = useState(false);
   const [positions, setPositions] = useState("");
   const subscription = subscriptions.find((item) => String(item.positions) === positions);
@@ -139,6 +140,8 @@ export function AgreementForm() {
       monthly: subscription?.monthly,
       quarterly: subscription?.quarterly,
       accepted: fields.get("accepted") === "on",
+      generalTermsAccepted: fields.get("generalTermsAccepted") === "on",
+      generalTermsId: generalTerms.id,
       subscriptionAccepted: fields.get("subscriptionAccepted") === "on",
       subscriptionConsentText: subscription ? subscriptionConsent(subscription) : "",
       subscriptionVersion,
@@ -336,10 +339,14 @@ export function AgreementForm() {
             <input name="subscriptionAccepted" type="checkbox" required disabled={!subscription} checked={subscriptionAccepted} onChange={(event) => setSubscriptionAccepted(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300" />
             <span>{subscription ? subscriptionConsent(subscription) : "Kies eerst het aantal posities om uw abonnementskeuze te bevestigen."}</span>
           </label>
+          <label className="flex items-start gap-3 text-sm leading-6 text-slate-300">
+            <input name="generalTermsAccepted" type="checkbox" required checked={generalTermsAccepted} onChange={(event) => setGeneralTermsAccepted(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300" />
+            <span>Ik heb de <a href={generalTerms.path} target="_blank" rel="noopener noreferrer" className="text-emerald-300 underline underline-offset-4 hover:text-emerald-200">Algemene Voorwaarden MakeMoreMoney</a> gelezen en ga hiermee akkoord.</span>
+          </label>
           <p className="text-sm leading-6 text-slate-400">
-            Door op ‘Abonnement en overeenkomst bevestigen’ te klikken, bevestigt u uw gegevens, uw abonnementskeuze en uw akkoord met de Copy Trading Raamovereenkomst MakeMoreMoney.
+            Door op ‘Abonnement en overeenkomst bevestigen’ te klikken, bevestigt u uw gegevens, uw abonnementskeuze en uw akkoord met de Copy Trading Raamovereenkomst MakeMoreMoney en de Algemene Voorwaarden MakeMoreMoney.
           </p>
-          <button type="submit" disabled={!accepted || !subscriptionAccepted || !subscription || !available || pending} className={`${buttonClass} w-full sm:w-auto`}>
+          <button type="submit" disabled={!accepted || !generalTermsAccepted || !subscriptionAccepted || !subscription || !available || pending} className={`${buttonClass} w-full sm:w-auto`}>
             {pending ? "Akkoord registreren..." : "Abonnement en overeenkomst bevestigen"}
           </button>
         </fieldset>

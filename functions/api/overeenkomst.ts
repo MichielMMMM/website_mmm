@@ -2,7 +2,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import nodemailer from "nodemailer";
 import net from "node:net";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
-import { agreement, formatAgreementTime, formatSubscriptionAmount, subscriptionTerms, validateAgreement } from "../../lib/agreement";
+import { agreement, generalTerms, formatAgreementTime, formatSubscriptionAmount, subscriptionTerms, validateAgreement } from "../../lib/agreement";
 
 type Environment = {
   AGREEMENTS_DB?: D1Database;
@@ -37,6 +37,9 @@ type StoredAgreement = {
   document_date: string;
   consent_text: string;
   subscription_consent_text: string;
+  general_terms_name: string;
+  general_terms_version: string;
+  general_terms_date: string;
   accepted_at: string;
 };
 
@@ -109,6 +112,7 @@ async function notifyCustomer(env: Environment, data: StoredAgreement) {
             ...(data.notes ? ["AANVULLENDE INFORMATIE", data.notes] : []),
             "UW OVEREENKOMST",
             `U heeft akkoord gegeven op de ${data.document_name}.`,
+            `U heeft ook akkoord gegeven op de ${data.general_terms_name}, versie ${data.general_terms_version} van ${data.general_terms_date}.`,
             [
               `Documentversie: ${data.document_version}`,
               `Documentdatum: ${data.document_date}`,
@@ -244,9 +248,10 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
         email, positions, indicative_capital, monthly_rate, quarterly_rate,
         subscription_consent_text, subscription_accepted, subscription_version, notification_status,
         initials, first_name, last_name, company_name, phone, postcode,
-        house_number, house_number_addition, street, city, country, confirmation_year, notes
+        house_number, house_number_addition, street, city, country, confirmation_year, notes,
+        general_terms_name, general_terms_version, general_terms_date, general_terms_consent_text, general_terms_accepted
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending',
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
       validation.data.fullName,
@@ -279,6 +284,11 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
       validation.data.country,
       confirmationYear,
       validation.data.notes,
+      generalTerms.name,
+      generalTerms.version,
+      generalTerms.date,
+      generalTerms.consentText,
+      1,
     ).run();
     if (!result.success || result.meta.changes < 1) {
       console.error("agreement_insert_not_confirmed");
@@ -296,7 +306,8 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
       SELECT id, full_name, email, strategy_label, positions, indicative_capital,
         monthly_rate, quarterly_rate, document_name, document_version, document_date,
         consent_text, subscription_consent_text, accepted_at, first_name, company_name,
-        street, house_number, house_number_addition, postcode, city, country, confirmation_number, notes
+        street, house_number, house_number_addition, postcode, city, country, confirmation_number, notes,
+        general_terms_name, general_terms_version, general_terms_date
       FROM agreement_acceptances WHERE id = ?
     `).bind(id).first<StoredAgreement>();
   } catch {
