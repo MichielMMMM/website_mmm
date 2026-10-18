@@ -116,6 +116,9 @@ export function SiteFooter() {
                 <Link href={item.href} className="hover:text-white">{item.label}</Link>
               </li>
             ))}
+            <li>
+              <Link href="/algemene-voorwaarden" className="hover:text-white">Algemene voorwaarden</Link>
+            </li>
           </ul>
         </div>
 
