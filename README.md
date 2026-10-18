@@ -83,7 +83,7 @@ Het formulier verifieert niet de identiteit of het bestaande klant-/rekeningbezi
 ### Productie instellen
 
 1. Plaats het definitieve PDF-document op
-   `public/documenten/copy-trading-raamovereenkomst-makemoremoney-v1.pdf`.
+   `public/documenten/copy-trading-raamovereenkomst-makemoremoney-v1.0.pdf`.
    De knop en verzending worden pas actief als de Function dit document als PDF kan
    ophalen en de databasebinding aanwezig is. Er wordt geen tijdelijke overeenkomst
    als echt document aangeboden.

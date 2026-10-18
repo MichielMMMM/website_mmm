@@ -3,7 +3,7 @@ export const agreement = {
   name: "Copy Trading Raamovereenkomst MakeMoreMoney",
   version: "1.0",
   date: "01-09-2026",
-  documentPath: "/documenten/copy-trading-raamovereenkomst-makemoremoney-v1.pdf",
+  documentPath: "/documenten/copy-trading-raamovereenkomst-makemoremoney-v1.0.pdf",
   consentText:
     "Ik heb de Copy Trading Raamovereenkomst MakeMoreMoney, versie 1.0 van 01-09-2026, gelezen en ga hiermee akkoord.",
 } as const;
