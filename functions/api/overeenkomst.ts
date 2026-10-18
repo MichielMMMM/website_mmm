@@ -67,7 +67,14 @@ async function notifyOwner(env: Environment, data: AgreementInput, id: string, a
       ? error.code : "UNKNOWN";
     const responseCode = error instanceof Error && "responseCode" in error &&
       typeof error.responseCode === "number" ? error.responseCode : undefined;
-    console.error("agreement_email_request_failed", { code, responseCode });
+    const command = error instanceof Error && "command" in error &&
+      typeof error.command === "string" && /^(CONN|EHLO|HELO|STARTTLS|AUTH|DATA)$/.test(error.command)
+      ? error.command : undefined;
+    const reason = error instanceof Error
+      ? ["not implemented", "not supported", "is not a function", "certificate", "ECONNREFUSED", "ECONNRESET", "timeout", "starttls", "TLS", "DNS", "socket"]
+        .find((category) => error.message.toLowerCase().includes(category.toLowerCase()))
+      : undefined;
+    console.error("agreement_email_request_failed", { code, responseCode, command, reason });
     return "failed";
   } finally {
     transport.close();
