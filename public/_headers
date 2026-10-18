@@ -1,0 +1,11 @@
+/klant/overeenkomst
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer
+
+/klant/overeenkomst.html
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer
+
+/documenten/*
+  X-Robots-Tag: noindex, nofollow
+  X-Content-Type-Options: nosniff
