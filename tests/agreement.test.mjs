@@ -31,6 +31,7 @@ const postcodeCompiled = ts.transpileModule(postcodeSource, { compilerOptions: {
   .replace('"../../lib/agreement"', JSON.stringify(agreementModuleUrl));
 const { onRequest: lookupPostcode } = await import(`data:text/javascript;base64,${Buffer.from(postcodeCompiled).toString("base64")}`);
 const validInput = {
+  salutation: "neutraal",
   initials: "",
   firstName: "Testklant",
   lastName: "Voorbeeld",
@@ -57,6 +58,12 @@ const validInput = {
 };
 
 test("validation requires explicit consent, current document and valid fields", () => {
+  for (const salutation of ["heer", "mevrouw", "neutraal"]) {
+    assert.equal(validateAgreement({ ...validInput, salutation }).data.salutation, salutation);
+  }
+  const { salutation: omittedSalutation, ...oldInput } = validInput;
+  assert.equal(omittedSalutation, "neutraal");
+  assert.equal(validateAgreement(oldInput).data.salutation, "neutraal");
   assert.equal(agreement.version, "1.0");
   assert.equal(agreement.date, "01-09-2026");
   assert.equal(agreement.consentText, "Ik heb de Copy Trading Raamovereenkomst MakeMoreMoney gelezen en ga hiermee akkoord.");
@@ -69,6 +76,7 @@ test("validation requires explicit consent, current document and valid fields", 
   for (const fields of [
     { firstName: "  " }, { lastName: "" }, { firstName: "a".repeat(81) },
     { firstName: "Test\nKlant" },
+    { salutation: "invalid" }, { salutation: null }, { salutation: 1 },
     { postcode: "0000AB" }, { houseNumber: "12A" }, { street: "" }, { city: "" }, { country: "" },
     { initials: "\nA" }, { companyName: "x".repeat(201) }, { phone: "abc" },
     { notes: "x".repeat(2001) }, { notes: "\u0000" },
@@ -146,6 +154,8 @@ test("account migration preserves historical evidence and confirmation sequence"
     const historical = db.prepare("SELECT general_terms_accepted, general_terms_consent_text FROM agreement_acceptances WHERE id = 'historical'").get();
     assert.equal(historical.general_terms_accepted, null);
     assert.equal(historical.general_terms_consent_text, null);
+    db.exec(await readFile(path.join(root, "migrations", "0007_customer_salutation.sql"), "utf8"));
+    assert.equal(db.prepare("SELECT salutation FROM agreement_acceptances WHERE id = 'historical'").get().salutation, null);
   } finally {
     db.close();
   }
@@ -211,6 +221,8 @@ test("built HTML has exact robots directive and no discoverable links or sitemap
   const html = await readFile(path.join(root, "out", "klant", "overeenkomst.html"), "utf8");
   assert.match(html, /<meta name="robots" content="noindex, nofollow"\s*\/?>/);
   assert.match(html, /Bevestig uw MakeMoreMoney-abonnement/);
+  assert.match(html, /name="salutation"/);
+  assert.match(html, /<option value="neutraal" selected="">Neutrale aanhef<\/option>/);
   assert.doesNotMatch(html, /Private investing|Plan een gesprek|hello@makemoremoney.nl|<nav\b|href="\/contact"/i);
   assert.match(html, /© MakeMoreMoney/);
   assert.doesNotMatch(html, /Het document opent in een nieuw tabblad/);
@@ -288,7 +300,9 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       id: "stored-registration-id",
       full_name: "Opgeslagen Klant",
       first_name: "Opgeslagen",
-      company_name: "Voorbeeld BV",
+      last_name: "van Dijk",
+      salutation: outcome === "queued" ? "heer" : outcome === "rejected" ? "mevrouw" : "neutraal",
+      company_name: "Voorbeeld & <bedrijf>",
       street: "Spui",
       house_number: "68",
       house_number_addition: "A",
@@ -344,10 +358,14 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       assert.deepEqual(message.from, { name: "Make More Money", address: "michiel2@mijs.nl" });
       assert.equal(message.subject, "Bevestiging MakeMoreMoney-abonnement en overeenkomst");
       for (const text of [
-        `Beste ${snapshot.first_name},`, snapshot.strategy_label, snapshot.confirmation_number,
+        snapshot.salutation === "heer" ? "Geachte heer van Dijk,"
+          : snapshot.salutation === "mevrouw" ? "Geachte mevrouw van Dijk," : "Geachte Opgeslagen van Dijk,",
+        snapshot.strategy_label, snapshot.confirmation_number,
         snapshot.full_name, snapshot.company_name, "Spui 68A", "2511 BT 's-Gravenhage", snapshot.country,
         snapshot.document_name, snapshot.notes,
-        `U heeft ook akkoord gegeven op de ${snapshot.general_terms_name}, versie ${snapshot.general_terms_version} van ${snapshot.general_terms_date}.`,
+        "U heeft akkoord gegeven op:",
+        `- De ${snapshot.document_name}: https://makemoremoney.nl${agreement.documentPath}`,
+        `- De algemene voorwaarden van MakeMoreMoney: https://makemoremoney.nl${generalTerms.path}`,
         "Aantal posities: 3", "€ 25.500", "€ 51 per maand", "€ 153 per drie maanden",
         "18-10-2026 om 13:00", subscriptionTerms, "Met vriendelijke groet,",
       ]) assert.ok(message.text.includes(text), `Missing stored mail content: ${text}`);
@@ -356,6 +374,11 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       assert.ok(!message.text.includes(snapshot.id));
       assert.ok(!message.text.includes(snapshot.consent_text));
       assert.ok(!message.text.includes(snapshot.subscription_consent_text));
+      assert.doesNotMatch(message.text, /Documentversie:|Documentdatum:|stored-terms-version|stored-terms-date|Beste /);
+      assert.match(message.html, /<ul><li><a href="https:\/\/makemoremoney.nl\/documenten\//);
+      assert.match(message.html, /<li><a href="https:\/\/makemoremoney.nl\/algemene-voorwaarden">De algemene voorwaarden van MakeMoreMoney<\/a><\/li>/);
+      assert.match(message.html, /Voorbeeld &amp; &lt;bedrijf&gt;/);
+      assert.doesNotMatch(message.html, /<bedrijf>/);
       assert.equal(message.text.match(/Aantal posities:/g).length, 1);
       assert.ok(!message.text.includes("TradeConnector"));
       if (outcome === "timeout" || outcome === "auth-error") throw new Error("simulated SMTP failure");
@@ -482,6 +505,7 @@ test("Cloudflare Function stores real D1 records and rejects invalid or unavaila
     }
     assert.equal((await post({ ...validInput, generalTermsId: "old" })).status, 400);
     assert.equal((await post({ ...validInput, email: "invalid" })).status, 400);
+    assert.equal((await post({ ...validInput, salutation: "invalid" })).status, 400);
     assert.equal((await post({ ...validInput, positions: 21 })).status, 400);
     assert.equal((await post({ ...validInput, monthly: 1 })).status, 400);
     assert.equal((await post({ ...validInput, subscriptionConsentText: "altered" })).status, 400);
@@ -512,6 +536,7 @@ test("Cloudflare Function stores real D1 records and rejects invalid or unavaila
     assert.deepEqual({ ...records[0], notification_updated_at: undefined }, {
       id: records[0].id,
       full_name: validInput.fullName,
+      salutation: validInput.salutation,
       mexem_account_number: null,
       strategy: validInput.strategy,
       strategy_label: subscriptionStrategy,

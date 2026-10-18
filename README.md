@@ -113,6 +113,10 @@ Het formulier verifieert niet de identiteit of het bestaande klant-/rekeningbezi
    Voer `migrations/0006_general_terms_acceptance.sql` eenmaal uit voor deployment
    van de verplichte algemene-voorwaardencheckbox. Bestaande registraties houden
    NULL in deze velden: hiervoor wordt geen akkoord achteraf aangenomen.
+   Voer `migrations/0007_customer_salutation.sql` eenmaal uit voor deployment van
+   de optionele aanhefkeuze. Historische registraties behouden NULL; nieuwe
+   formulieren kiezen standaard `neutraal`. Een ontbrekende keuze in een reeds
+   geopend formulier wordt als neutraal verwerkt, ongeldige waarden worden afgewezen.
 4. Koppel bij **Workers & Pages > website-mmm > Settings > Bindings** een
    D1-database met bindingsnaam **AGREEMENTS_DB**. Koppel preview aan een aparte
    testdatabase als previews moeten kunnen registreren; gebruik daar niet de
@@ -135,7 +139,11 @@ IP-adres of user-agent naar applicatielogs geschreven of via de URL verstuurd.
 Er is geen publieke API voor het uitlezen van akkoorden.
 Het algemene-voorwaardenakkoord is verplicht in browser en API. Naam, versie,
 datum en exacte akkoordtekst worden bij dezelfde registratie met hetzelfde
-UTC-tijdstip opgeslagen. De bevestigingsmail gebruikt de opgeslagen versie en datum.
+UTC-tijdstip opgeslagen. De bevestigingsmail toont twee klikbare documentverwijzingen
+zonder losse documentversies of documentdatums; deze blijven wel als bewijs opgeslagen.
+De optionele aanhefkeuze wordt opgeslagen als `heer`, `mevrouw` of `neutraal`.
+De mail gebruikt de opgeslagen achternaam bij heer/mevrouw en voor- en achternaam
+bij neutraal. Zowel HTML (met ontsnapte klantgegevens) als platte tekst wordt verstuurd.
 
 Nieuwe registraties bewaren voorletters, voornaam en achternaam afzonderlijk, met een
 samengestelde volledige naam (zonder dubbele spaties), optionele bedrijfsnaam en

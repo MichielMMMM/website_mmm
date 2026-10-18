@@ -121,6 +121,7 @@ export function AgreementForm() {
     const form = event.currentTarget;
     const fields = new FormData(form);
     const payload = {
+      salutation: fields.get("salutation"),
       initials: fields.get("initials"),
       firstName: fields.get("firstName"),
       lastName: fields.get("lastName"),
@@ -221,6 +222,14 @@ export function AgreementForm() {
         <fieldset disabled={!available || pending} className="space-y-5 disabled:opacity-60">
           <legend className="sr-only">Velden met optioneel in het label zijn niet verplicht</legend>
           <h3 className="text-lg font-bold text-white">Persoonlijke gegevens</h3>
+          <div>
+            <label htmlFor="agreement-salutation" className="mb-2 block text-sm text-slate-300">Aanhef (optioneel)</label>
+            <select id="agreement-salutation" name="salutation" defaultValue="neutraal" className={inputClass}>
+              <option value="heer">De heer</option>
+              <option value="mevrouw">Mevrouw</option>
+              <option value="neutraal">Neutrale aanhef</option>
+            </select>
+          </div>
           <div className="grid gap-5 sm:grid-cols-3">
             <div>
               <label htmlFor="agreement-initials" className="mb-2 block text-sm text-slate-300">Voorletters (optioneel)</label>

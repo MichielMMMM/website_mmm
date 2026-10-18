@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import net from "node:net";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import { agreement, generalTerms, formatAgreementTime, formatSubscriptionAmount, subscriptionTerms, validateAgreement } from "../../lib/agreement";
+import type { AgreementInput } from "../../lib/agreement";
 
 type Environment = {
   AGREEMENTS_DB?: D1Database;
@@ -17,6 +18,8 @@ type StoredAgreement = {
   id: string;
   full_name: string;
   first_name: string;
+  last_name: string;
+  salutation: AgreementInput["salutation"];
   company_name: string;
   street: string;
   house_number: string;
@@ -42,6 +45,11 @@ type StoredAgreement = {
   general_terms_date: string;
   accepted_at: string;
 };
+
+function escapeHtml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 
 async function notifyCustomer(env: Environment, data: StoredAgreement) {
   if (!env.SMTP_PASSWORD) {
@@ -84,13 +92,16 @@ async function notifyCustomer(env: Environment, data: StoredAgreement) {
     },
   });
   try {
-    const result = await transport.sendMail({
-          to: data.email,
-          bcc: notificationRecipient,
-          from: { name: "Make More Money", address: notificationSender },
-          subject: "Bevestiging MakeMoreMoney-abonnement en overeenkomst",
-          text: [
-            `Beste ${data.first_name},`,
+    const greeting = data.salutation === "heer" ? `Geachte heer ${data.last_name},`
+      : data.salutation === "mevrouw" ? `Geachte mevrouw ${data.last_name},`
+      : `Geachte ${data.first_name} ${data.last_name},`;
+    const documents = [
+      { label: `De ${data.document_name}`, url: `https://makemoremoney.nl${agreement.documentPath}` },
+      { label: "De algemene voorwaarden van MakeMoreMoney", url: `https://makemoremoney.nl${generalTerms.path}` },
+    ];
+    const documentList = documents.map(({ label, url }) => `- ${label}: ${url}`).join("\n");
+    const paragraphs = [
+            greeting,
             "Bedankt voor uw bevestiging. Hieronder vindt u de gegevens van uw abonnement en overeenkomst.",
             "UW ABONNEMENT",
             [
@@ -111,17 +122,24 @@ async function notifyCustomer(env: Environment, data: StoredAgreement) {
             ].join("\n"),
             ...(data.notes ? ["AANVULLENDE INFORMATIE", data.notes] : []),
             "UW OVEREENKOMST",
-            `U heeft akkoord gegeven op de ${data.document_name}.`,
-            `U heeft ook akkoord gegeven op de ${data.general_terms_name}, versie ${data.general_terms_version} van ${data.general_terms_date}.`,
+            "U heeft akkoord gegeven op:",
+            documentList,
             [
-              `Documentversie: ${data.document_version}`,
-              `Documentdatum: ${data.document_date}`,
               `Datum akkoord: ${formatAgreementTime(data.accepted_at)}`,
               `Bevestigingsnummer: ${data.confirmation_number}`,
             ].join("\n"),
             "Met vriendelijke groet,",
             "MakeMoreMoney",
-          ].join("\n\n"),
+          ];
+    const result = await transport.sendMail({
+          to: data.email,
+          bcc: notificationRecipient,
+          from: { name: "Make More Money", address: notificationSender },
+          subject: "Bevestiging MakeMoreMoney-abonnement en overeenkomst",
+          text: paragraphs.join("\n\n"),
+          html: paragraphs.map((paragraph) => paragraph === documentList
+            ? `<ul>${documents.map(({ label, url }) => `<li><a href="${escapeHtml(url)}">${escapeHtml(label)}</a></li>`).join("")}</ul>`
+            : `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`).join("\n"),
     });
     if ([data.email, notificationRecipient].every((expected) =>
           result.accepted.some((recipient) => typeof recipient === "string" && recipient === expected)) &&
@@ -249,9 +267,10 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
         subscription_consent_text, subscription_accepted, subscription_version, notification_status,
         initials, first_name, last_name, company_name, phone, postcode,
         house_number, house_number_addition, street, city, country, confirmation_year, notes,
-        general_terms_name, general_terms_version, general_terms_date, general_terms_consent_text, general_terms_accepted
+        general_terms_name, general_terms_version, general_terms_date, general_terms_consent_text, general_terms_accepted,
+        salutation
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending',
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
       validation.data.fullName,
@@ -289,6 +308,7 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
       generalTerms.date,
       generalTerms.consentText,
       1,
+      validation.data.salutation,
     ).run();
     if (!result.success || result.meta.changes < 1) {
       console.error("agreement_insert_not_confirmed");
@@ -307,7 +327,7 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
         monthly_rate, quarterly_rate, document_name, document_version, document_date,
         consent_text, subscription_consent_text, accepted_at, first_name, company_name,
         street, house_number, house_number_addition, postcode, city, country, confirmation_number, notes,
-        general_terms_name, general_terms_version, general_terms_date
+        general_terms_name, general_terms_version, general_terms_date, last_name, salutation
       FROM agreement_acceptances WHERE id = ?
     `).bind(id).first<StoredAgreement>();
   } catch {

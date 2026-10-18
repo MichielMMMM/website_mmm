@@ -73,6 +73,7 @@ export function formatAgreementTime(timestamp: string) {
 }
 
 export type AgreementInput = {
+  salutation: "heer" | "mevrouw" | "neutraal";
   initials: string;
   firstName: string;
   lastName: string;
@@ -106,6 +107,11 @@ export function validateAgreement(value: unknown):
   | { valid: false; message: string } {
   if (typeof value !== "object" || value === null) {
     return { valid: false, message: "Controleer uw gegevens en probeer opnieuw." };
+  }
+
+  const salutation = "salutation" in value ? value.salutation : "neutraal";
+  if (salutation !== "heer" && salutation !== "mevrouw" && salutation !== "neutraal") {
+    return { valid: false, message: "Kies een geldige aanhef." };
   }
 
   if (!("accepted" in value) || value.accepted !== true) {
@@ -208,6 +214,7 @@ export function validateAgreement(value: unknown):
   return {
     valid: true,
     data: {
+      salutation,
       fullName,
       initials,
       firstName,
