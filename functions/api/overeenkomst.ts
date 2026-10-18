@@ -8,11 +8,11 @@ import type { AgreementInput } from "../../lib/agreement";
 type Environment = {
   AGREEMENTS_DB?: D1Database;
   ASSETS: { fetch: typeof fetch };
-  SMTP_PASSWORD?: string;
+  SMTP_INFO_PASSWORD?: string;
 };
 
-const notificationRecipient = "michiel@mijs.nl";
-const notificationSender = "michiel2@mijs.nl";
+const notificationRecipient = "info@makemoremoney.nl";
+const notificationSender = "info@makemoremoney.nl";
 
 type StoredAgreement = {
   id: string;
@@ -52,7 +52,7 @@ function escapeHtml(value: string) {
 }
 
 async function notifyCustomer(env: Environment, data: StoredAgreement) {
-  if (!env.SMTP_PASSWORD) {
+  if (!env.SMTP_INFO_PASSWORD) {
     console.error("agreement_email_not_configured");
     return "not_configured";
   }
@@ -61,7 +61,7 @@ async function notifyCustomer(env: Environment, data: StoredAgreement) {
     port: 587,
     secure: false,
     requireTLS: true,
-    auth: { user: notificationSender, pass: env.SMTP_PASSWORD },
+    auth: { user: notificationSender, pass: env.SMTP_INFO_PASSWORD },
     tls: { servername: "smtp.hostnet.nl", minVersion: "TLSv1.2", rejectUnauthorized: true },
     connectionTimeout: 10000,
     greetingTimeout: 10000,

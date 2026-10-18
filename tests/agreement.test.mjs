@@ -333,7 +333,7 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       assert.equal(options.requireTLS, true);
       assert.equal(options.tls.rejectUnauthorized, true);
       assert.equal(options.tls.servername, "smtp.hostnet.nl");
-      assert.equal(options.auth.user, "michiel2@mijs.nl");
+      assert.equal(options.auth.user, "info@makemoremoney.nl");
       assert.equal(options.auth.pass, "test-password");
       const socket = new EventEmitter();
       socket.setTimeout = () => socket;
@@ -354,8 +354,8 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       events.push("email");
       assert.equal(stored, true);
       assert.equal(message.to, snapshot.email);
-      assert.equal(message.bcc, "michiel@mijs.nl");
-      assert.deepEqual(message.from, { name: "Make More Money", address: "michiel2@mijs.nl" });
+      assert.equal(message.bcc, "info@makemoremoney.nl");
+      assert.deepEqual(message.from, { name: "Make More Money", address: "info@makemoremoney.nl" });
       assert.equal(message.subject, "Bevestiging MakeMoreMoney-abonnement en overeenkomst");
       for (const text of [
         snapshot.salutation === "heer" ? "Geachte heer van Dijk,"
@@ -385,8 +385,8 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       if (outcome === "timeout" || outcome === "auth-error") throw new Error("simulated SMTP failure");
       return {
         accepted: outcome === "queued" || outcome === "status-failure"
-          ? [snapshot.email, "michiel@mijs.nl"] : outcome === "owner-rejected" ? [snapshot.email] : [],
-        rejected: outcome === "rejected" ? [snapshot.email] : outcome === "owner-rejected" ? ["michiel@mijs.nl"] : [],
+          ? [snapshot.email, "info@makemoremoney.nl"] : outcome === "owner-rejected" ? [snapshot.email] : [],
+        rejected: outcome === "rejected" ? [snapshot.email] : outcome === "owner-rejected" ? ["info@makemoremoney.nl"] : [],
       };
       } };
     });
@@ -422,7 +422,7 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       env: {
         AGREEMENTS_DB: database,
         ASSETS: { fetch: async () => new Response("", { headers: { "Content-Type": "application/pdf" } }) },
-        SMTP_PASSWORD: "test-password",
+        SMTP_INFO_PASSWORD: "test-password",
       },
     });
     const result = await response.json();

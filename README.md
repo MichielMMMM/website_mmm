@@ -181,7 +181,7 @@ er bestaat geen IBKR- of MEXEM-lookup.
 
 Na een bevestigde insert stuurt de Function via Hostnet SMTP een
 tekstmail naar het opgeslagen e-mailadres van de klant, met een blinde kopie aan
-**michiel@mijs.nl**. De Function leest de registratie terug uit D1 en gebruikt de
+**info@makemoremoney.nl**. De Function leest de registratie terug uit D1 en gebruikt de
 opgeslagen voornaam, factuurgegevens, bedragen, documentgegevens, tijdstip en RUITAB-nummer.
 De compacte klantmail toont geen UUID of letterlijke checkboxteksten; deze blijven
 wel ongewijzigd in D1 opgeslagen. Ingevulde opmerkingen worden ook vermeld.
@@ -189,8 +189,8 @@ Het onderwerp is **Bevestiging MakeMoreMoney-abonnement en overeenkomst**.
 De mail bevat persoonsgegevens: beveilig ook de ontvangende mailbox en neem
 deze verwerking mee in uw privacy- en bewaarbeleid.
 
-De zichtbare afzender is **Make More Money <michiel2@mijs.nl>**; de SMTP-login blijft
-**michiel2@mijs.nl**. De Function gebruikt
+De zichtbare afzender is **Make More Money <info@makemoremoney.nl>**; de SMTP-login is
+**info@makemoremoney.nl**. De Function gebruikt
 `smtp.hostnet.nl:587`, verplichte STARTTLS en certificaatcontrole voor `smtp.hostnet.nl`.
 De verbinding wordt via Nodemailers `getSocket` met de hostnaam geopend. Zo blijft
 de hostnaam beschikbaar voor certificaatcontrole in de Cloudflare-runtime, zonder
@@ -200,9 +200,13 @@ gehoste Cloudflare-app. Er is geen Cloudflare Email Sending-abonnement nodig.
 
 Configureer onder Pages > Settings > Variables and secrets:
 
-- `SMTP_PASSWORD`: als **secret**, het mailboxwachtwoord voor michiel2@mijs.nl.
+- `SMTP_INFO_PASSWORD`: als **secret**, het mailboxwachtwoord voor info@makemoremoney.nl.
   Gebruik een apart app-wachtwoord als Hostnet dit ondersteunt. Nooit in Git,
   chat, logs of een `NEXT_PUBLIC_`-variabele plaatsen.
+  Stel dit secret in voordat de nieuwe Function wordt gedeployd. Het aparte
+  secret voorkomt dat de oude deployment tijdens de overstap een verkeerd
+  mailboxwachtwoord gebruikt. Het oude `SMTP_PASSWORD` wordt niet meer gebruikt
+  door de nieuwe Function; er is geen terugval naar de oude mailbox.
 - Runtime: schakel `nodejs_compat` in en gebruik compatibility date
   `2026-09-19` of later, overeenkomstig de lokale Wrangler-configuratie.
   Bestaande overige compatibility flags blijven behouden.
