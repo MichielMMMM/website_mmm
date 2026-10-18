@@ -18,7 +18,7 @@ const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.Modu
 const agreementModuleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
 const {
   agreement, subscriptions, subscriptionStrategy, subscriptionVersion,
-  subscriptionConsent, formatSubscriptionAmount, validateAgreement,
+  subscriptionConsent, subscriptionTerms, formatSubscriptionAmount, validateAgreement,
 } = await import(agreementModuleUrl);
 const handlerSource = await readFile(path.join(root, "functions", "api", "overeenkomst.ts"), "utf8");
 const handlerCompiled = ts.transpileModule(handlerSource, { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText
@@ -39,6 +39,9 @@ const validInput = {
 };
 
 test("validation requires explicit consent, current document and valid fields", () => {
+  assert.equal(agreement.version, "1.0");
+  assert.equal(agreement.date, "01-09-2026");
+  assert.equal(agreement.consentText, "Ik heb de Copy Trading Raamovereenkomst MakeMoreMoney, versie 1.0 van 01-09-2026, gelezen en ga hiermee akkoord.");
   assert.equal(validateAgreement(validInput).valid, true);
   for (const accepted of [false, undefined, "true", "on", 1, null]) {
     assert.equal(validateAgreement({ ...validInput, accepted }).valid, false);
@@ -54,6 +57,7 @@ test("validation requires explicit consent, current document and valid fields", 
     { capital: 1 }, { monthly: 1 }, { quarterly: 1 },
     { subscriptionConsentText: "edited" }, { subscriptionVersion: "old" },
     { strategy: "unknown" }, { agreementId: "old-version" },
+    { agreementId: "copy-trading-v1-2026-10-18" },
   ]) {
     assert.equal(validateAgreement({ ...validInput, ...fields }).valid, false);
   }
@@ -76,8 +80,9 @@ test("exact customer pricing, Dutch amounts and singular consent", () => {
   assert.equal(formatSubscriptionAmount(8500), "€ 8.500");
   assert.equal(formatSubscriptionAmount(42500), "€ 42.500");
   assert.equal(formatSubscriptionAmount(240), "€ 240");
-  assert.equal(subscriptionConsent(subscriptions[4]), "Ik bevestig dat Premie Collector Plus – volgsysteem en het gekozen abonnement van 5 posities, tegen € 80 per maand en € 240 per drie maanden, overeenkomen met de dienstverlening waarvan ik gebruik wil maken.");
-  assert.match(subscriptionConsent(subscriptions[0]), /van 1 positie, tegen € 25 per maand en € 75 per drie maanden/);
+  assert.equal(subscriptionConsent(subscriptions[2]), "Ik bevestig mijn keuze voor Premie Collector Plus – volgsysteem met 3 posities tegen € 50 per maand (€ 150 per drie maanden). Het abonnement wordt voor drie maanden aangegaan en vooraf betaald, wordt daarna telkens automatisch met drie maanden verlengd en kan worden opgezegd tot uiterlijk één maand vóór de eerstvolgende verlengingsdatum.");
+  assert.match(subscriptionConsent(subscriptions[0]), /met 1 positie tegen € 25 per maand \(€ 75 per drie maanden\)/);
+  assert.match(subscriptionConsent(subscriptions[19]), /met 20 posities tegen € 305 per maand \(€ 915 per drie maanden\)/);
 });
 
 test("built HTML has exact robots directive and no discoverable links or sitemap entry", async () => {
@@ -89,6 +94,8 @@ test("built HTML has exact robots directive and no discoverable links or sitemap
   assert.doesNotMatch(html, /Het document opent in een nieuw tabblad/);
   assert.match(html, /U hoeft deze koppeling niet opnieuw uit te voeren/);
   assert.ok(html.includes(agreement.consentText));
+  assert.ok(html.includes(subscriptionTerms));
+  assert.doesNotMatch(html, /Wij bewaren uw naam/);
   for (const route of ["index", "contact", "abonnement", "dashboard", "resultaten", "tarieven", "werkwijze", "werk-in-voortgang"]) {
     const otherHtml = await readFile(path.join(root, "out", `${route}.html`), "utf8");
     assert.doesNotMatch(otherHtml, /href=["']\/klant\/overeenkomst/);
@@ -132,10 +139,26 @@ test("missing PDF, HTML fallback or missing database cannot register an agreemen
 test("Hostnet notification requires TLS, follows storage and handles failures without losing consent", async (context) => {
   context.mock.method(console, "error", () => {});
   const origin = "https://example.test";
-  for (const outcome of ["queued", "rejected", "auth-error", "timeout", "insert-failure", "status-failure"]) {
+  for (const outcome of ["queued", "rejected", "owner-rejected", "auth-error", "timeout", "insert-failure", "read-failure", "missing-record", "status-failure"]) {
     const events = [];
     let stored = false;
     let status;
+    const snapshot = {
+      id: "stored-registration-id",
+      full_name: "Opgeslagen Klant",
+      email: "stored@example.test",
+      strategy_label: "Opgeslagen strategie",
+      positions: 3,
+      indicative_capital: 25500,
+      monthly_rate: 51,
+      quarterly_rate: 153,
+      document_name: "Opgeslagen document",
+      document_version: "stored-version",
+      document_date: "17-10-2026",
+      consent_text: "Exact opgeslagen eerste akkoord.",
+      subscription_consent_text: "Exact opgeslagen tweede akkoord met voorwaarden.",
+      accepted_at: "2026-10-18T11:00:00.000Z",
+    };
     context.mock.method(nodemailer, "createTransport", (options) => {
       assert.equal(options.host, "smtp.hostnet.nl");
       assert.equal(options.port, 587);
@@ -162,22 +185,36 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       return { close() {}, async sendMail(message) {
       events.push("email");
       assert.equal(stored, true);
-      assert.equal(message.to, "michiel@mijs.nl");
+      assert.equal(message.to, snapshot.email);
+      assert.equal(message.bcc, "michiel@mijs.nl");
       assert.deepEqual(message.from, { name: "Make More Money", address: "michiel2@mijs.nl" });
-      assert.ok(message.text.includes(validInput.subscriptionConsentText));
-      assert.ok(message.text.includes(agreement.consentText));
-      assert.ok(message.text.includes("€ 240"));
+      assert.equal(message.subject, "Bevestiging MakeMoreMoney-abonnement en overeenkomst");
+      for (const text of [
+        `Beste ${snapshot.full_name},`, snapshot.strategy_label, snapshot.id,
+        snapshot.subscription_consent_text, snapshot.consent_text, snapshot.document_name,
+        "Aantal posities: 3", "€ 25.500", "€ 51 per maand", "€ 153 per drie maanden",
+        "18 oktober 2026", "13:00:00", subscriptionTerms, "Met vriendelijke groet,",
+      ]) assert.ok(message.text.includes(text), `Missing stored mail content: ${text}`);
+      assert.ok(!message.text.includes(validInput.subscriptionConsentText));
+      assert.ok(!message.text.includes(agreement.consentText));
       if (outcome === "timeout" || outcome === "auth-error") throw new Error("simulated SMTP failure");
       return {
-        accepted: outcome === "queued" || outcome === "status-failure" ? ["michiel@mijs.nl"] : [],
-        rejected: outcome === "rejected" ? ["michiel@mijs.nl"] : [],
+        accepted: outcome === "queued" || outcome === "status-failure"
+          ? [snapshot.email, "michiel@mijs.nl"] : outcome === "owner-rejected" ? [snapshot.email] : [],
+        rejected: outcome === "rejected" ? [snapshot.email] : outcome === "owner-rejected" ? ["michiel@mijs.nl"] : [],
       };
       } };
     });
     const database = {
       prepare(sql) {
         return { bind(...values) {
-          return { async run() {
+          return { async first() {
+            events.push("read");
+            assert.equal(stored, true);
+            assert.match(sql, /SELECT/);
+            if (outcome === "read-failure") throw new Error("read unavailable");
+            return outcome === "missing-record" ? null : snapshot;
+          }, async run() {
             if (sql.includes("INSERT")) {
               events.push("insert");
               if (outcome === "insert-failure") throw new Error("storage unavailable");
@@ -209,7 +246,8 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       assert.deepEqual(events, ["insert"]);
     } else {
       assert.equal(response.status, 201);
-      assert.deepEqual(events, ["insert", "email", "status"]);
+      assert.deepEqual(events, outcome === "read-failure" || outcome === "missing-record"
+        ? ["insert", "read", "status"] : ["insert", "read", "email", "status"]);
       const expected = outcome === "queued" || outcome === "status-failure" ? "queued" : "failed";
       assert.equal(status, expected);
       assert.equal(result.notificationStatus, expected);

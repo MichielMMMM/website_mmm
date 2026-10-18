@@ -2,8 +2,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import nodemailer from "nodemailer";
 import net from "node:net";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
-import { agreement, formatSubscriptionAmount, validateAgreement } from "../../lib/agreement";
-import type { AgreementInput } from "../../lib/agreement";
+import { agreement, formatSubscriptionAmount, subscriptionTerms, validateAgreement } from "../../lib/agreement";
 
 type Environment = {
   AGREEMENTS_DB?: D1Database;
@@ -14,7 +13,24 @@ type Environment = {
 const notificationRecipient = "michiel@mijs.nl";
 const notificationSender = "michiel2@mijs.nl";
 
-async function notifyOwner(env: Environment, data: AgreementInput, id: string, acceptedAt: string) {
+type StoredAgreement = {
+  id: string;
+  full_name: string;
+  email: string;
+  strategy_label: string;
+  positions: number;
+  indicative_capital: number;
+  monthly_rate: number;
+  quarterly_rate: number;
+  document_name: string;
+  document_version: string;
+  document_date: string;
+  consent_text: string;
+  subscription_consent_text: string;
+  accepted_at: string;
+};
+
+async function notifyCustomer(env: Environment, data: StoredAgreement) {
   if (!env.SMTP_PASSWORD) {
     console.error("agreement_email_not_configured");
     return "not_configured";
@@ -56,28 +72,38 @@ async function notifyOwner(env: Environment, data: AgreementInput, id: string, a
   });
   try {
     const result = await transport.sendMail({
-          to: notificationRecipient,
+          to: data.email,
+          bcc: notificationRecipient,
           from: { name: "Make More Money", address: notificationSender },
-          subject: `MakeMoreMoney: abonnement en overeenkomst bevestigd (${id})`,
+          subject: "Bevestiging MakeMoreMoney-abonnement en overeenkomst",
           text: [
-            "Een klant heeft het abonnement en de overeenkomst bevestigd.",
-            `Registratienummer: ${id}`,
-            `Tijdstip (UTC): ${acceptedAt}`,
-            `Volledige naam: ${data.fullName}`,
-            `E-mailadres: ${data.email}`,
-            `MEXEM-rekeningnummer: ${data.accountNumber}`,
-            `Strategie: ${data.strategy}`,
-            `Aantal posities: ${data.positions}`,
-            `Indicatief benodigd kapitaal: ${formatSubscriptionAmount(data.capital)}`,
-            `Maandtarief: ${formatSubscriptionAmount(data.monthly)}`,
-            `Driemaandstarief: ${formatSubscriptionAmount(data.quarterly)}`,
-            `Document: ${agreement.name}, versie ${agreement.version} van ${agreement.date}`,
-            `Overeenkomst expliciet geaccepteerd: ja\n${agreement.consentText}`,
-            `Abonnement expliciet bevestigd: ja\n${data.subscriptionConsentText}`,
-            "De registratie is opgeslagen in D1. De bestaande MEXEM/TradeConnector-koppeling is ongewijzigd.",
+            `Beste ${data.full_name},`,
+            "Bedankt voor uw bevestiging.",
+            "Hierbij bevestigen wij uw abonnement op:",
+            data.strategy_label,
+            "Uw abonnementsgegevens:",
+            [
+              `Aantal posities: ${data.positions}`,
+              `Indicatief benodigd kapitaal: ${formatSubscriptionAmount(data.indicative_capital)}`,
+              `Abonnementskosten: ${formatSubscriptionAmount(data.monthly_rate)} per maand`,
+              `Te betalen: ${formatSubscriptionAmount(data.quarterly_rate)} per drie maanden`,
+            ].join("\n"),
+            subscriptionTerms,
+            "U heeft daarnaast akkoord gegeven op:",
+            `${data.document_name}\nVersie ${data.document_version} van ${data.document_date}`,
+            `Datum en tijd van akkoord:\n${new Intl.DateTimeFormat("nl-NL", {
+              dateStyle: "long", timeStyle: "long", timeZone: "Europe/Amsterdam",
+            }).format(new Date(data.accepted_at))}`,
+            `Registratienummer:\n${data.id}`,
+            `Uw bevestiging:\n“${data.subscription_consent_text}”`,
+            `U heeft eveneens bevestigd:\n“${data.consent_text}”`,
+            "Aan uw bestaande MEXEM/TradeConnector-koppeling verandert niets.",
+            "Met vriendelijke groet,",
+            "MakeMoreMoney",
           ].join("\n\n"),
     });
-    if (result.accepted.some((recipient) => typeof recipient === "string" && recipient === notificationRecipient) &&
+    if ([data.email, notificationRecipient].every((expected) =>
+          result.accepted.some((recipient) => typeof recipient === "string" && recipient === expected)) &&
         result.rejected.length === 0) {
       return "queued";
     }
@@ -228,7 +254,22 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
     return json({ message: "Uw akkoord kon niet worden geregistreerd. Probeer het later opnieuw." }, 503);
   }
 
-  const notificationStatus = await notifyOwner(env, validation.data, id, acceptedAt);
+  let notificationStatus = "failed";
+  try {
+    const stored = await database.prepare(`
+      SELECT id, full_name, email, strategy_label, positions, indicative_capital,
+        monthly_rate, quarterly_rate, document_name, document_version, document_date,
+        consent_text, subscription_consent_text, accepted_at
+      FROM agreement_acceptances WHERE id = ?
+    `).bind(id).first<StoredAgreement>();
+    if (!stored) {
+      console.error("agreement_email_record_missing");
+    } else {
+      notificationStatus = await notifyCustomer(env, stored);
+    }
+  } catch {
+    console.error("agreement_email_record_read_failed");
+  }
   let notificationRecorded = false;
   try {
     const result = await database.prepare(`
@@ -241,7 +282,7 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
   }
   const notificationWarning = !notificationRecorded ||
     notificationStatus !== "queued"
-    ? "Uw registratie is opgeslagen, maar de e-mailmelding aan MakeMoreMoney is niet bevestigd. Verzend het formulier niet opnieuw."
+    ? "Uw registratie is opgeslagen, maar de verzending van uw bevestigingsmail of de kopie aan MakeMoreMoney is niet bevestigd. Verzend het formulier niet opnieuw."
     : undefined;
   return json({ id, acceptedAt, notificationStatus, notificationWarning }, 201);
 }

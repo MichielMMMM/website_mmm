@@ -1,15 +1,16 @@
 export const agreement = {
-  id: "copy-trading-v1-2026-10-18",
+  id: "copy-trading-v1.0-2026-09-01",
   name: "Copy Trading Raamovereenkomst MakeMoreMoney",
-  version: "1",
-  date: "18-10-2026",
+  version: "1.0",
+  date: "01-09-2026",
   documentPath: "/documenten/copy-trading-raamovereenkomst-makemoremoney-v1.pdf",
   consentText:
-    "Ik heb de Copy Trading Raamovereenkomst MakeMoreMoney, versie 1 van 18-10-2026, gelezen en ga hiermee akkoord.",
+    "Ik heb de Copy Trading Raamovereenkomst MakeMoreMoney, versie 1.0 van 01-09-2026, gelezen en ga hiermee akkoord.",
 } as const;
 
 export const subscriptionStrategy = "Premie Collector Plus – volgsysteem";
-export const subscriptionVersion = "existing-customers-2026-10-18-v1";
+export const subscriptionVersion = "existing-customers-2026-10-18-v2";
+export const subscriptionTerms = "Het abonnement wordt per drie maanden vooruitbetaald en daarna telkens automatisch met drie maanden verlengd. Opzeggen kan tot uiterlijk één maand vóór de eerstvolgende verlengingsdatum.";
 export const subscriptions = [
   { positions: 1, capital: 8500, monthly: 25, quarterly: 75 },
   { positions: 2, capital: 17000, monthly: 40, quarterly: 120 },
@@ -44,7 +45,7 @@ export function positionLabel(positions: number) {
 }
 
 export function subscriptionConsent(subscription: Subscription) {
-  return `Ik bevestig dat ${subscriptionStrategy} en het gekozen abonnement van ${positionLabel(subscription.positions)}, tegen ${formatSubscriptionAmount(subscription.monthly)} per maand en ${formatSubscriptionAmount(subscription.quarterly)} per drie maanden, overeenkomen met de dienstverlening waarvan ik gebruik wil maken.`;
+  return `Ik bevestig mijn keuze voor ${subscriptionStrategy} met ${positionLabel(subscription.positions)} tegen ${formatSubscriptionAmount(subscription.monthly)} per maand (${formatSubscriptionAmount(subscription.quarterly)} per drie maanden). Het abonnement wordt voor drie maanden aangegaan en vooraf betaald, wordt daarna telkens automatisch met drie maanden verlengd en kan worden opgezegd tot uiterlijk één maand vóór de eerstvolgende verlengingsdatum.`;
 }
 
 export type AgreementInput = {
@@ -127,7 +128,7 @@ export function validateAgreement(value: unknown):
       ...subscription,
       accepted: true,
       subscriptionAccepted: true,
-      subscriptionConsentText: subscriptionConsent(subscription),
+      subscriptionConsentText: value.subscriptionConsentText,
       subscriptionVersion,
       agreementId: agreement.id,
     },

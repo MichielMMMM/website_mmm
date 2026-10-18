@@ -122,16 +122,19 @@ uitsluitend na een bevestigde database-insert. Er wordt geen naam, rekeningnumme
 IP-adres of user-agent naar applicatielogs geschreven of via de URL verstuurd.
 Er is geen publieke API voor het uitlezen van akkoorden.
 
-### E-mailmelding aan de beheerder
+### Bevestigingsmail aan de klant
 
 Na een bevestigde insert stuurt de Function via Hostnet SMTP een
-tekstmail naar **michiel@mijs.nl**, met registratie-ID, klantgegevens, opgeslagen
-bedragen en beide exacte akkoordverklaringen. Er gaat geen mail naar de klant.
+tekstmail naar het opgeslagen e-mailadres van de klant, met een blinde kopie aan
+**michiel@mijs.nl**. De Function leest de registratie terug uit D1 en gebruikt de
+opgeslagen bedragen, documentgegevens, tijdstip, registratie-ID en beide exacte
+akkoordverklaringen, niet opnieuw gegenereerde akkoordteksten uit de actuele prijstabel.
+Het onderwerp is **Bevestiging MakeMoreMoney-abonnement en overeenkomst**.
 De mail bevat persoonsgegevens: beveilig ook de ontvangende mailbox en neem
 deze verwerking mee in uw privacy- en bewaarbeleid.
 
 De zichtbare afzender is **Make More Money <michiel2@mijs.nl>**; de SMTP-login blijft
-**michiel2@mijs.nl** en de ontvanger is **michiel@mijs.nl**. De Function gebruikt
+**michiel2@mijs.nl**. De Function gebruikt
 `smtp.hostnet.nl:587`, verplichte STARTTLS en certificaatcontrole voor `smtp.hostnet.nl`.
 De verbinding wordt via Nodemailers `getSocket` met de hostnaam geopend. Zo blijft
 de hostnaam beschikbaar voor certificaatcontrole in de Cloudflare-runtime, zonder

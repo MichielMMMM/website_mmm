@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   agreement, formatSubscriptionAmount, positionLabel, subscriptions,
-  subscriptionConsent, subscriptionStrategy, subscriptionVersion, validateAgreement,
+  subscriptionConsent, subscriptionStrategy, subscriptionTerms, subscriptionVersion, validateAgreement,
 } from "@/lib/agreement";
 
 const inputClass =
@@ -208,8 +208,7 @@ export function AgreementForm() {
             </section>
           )}
           <div className="space-y-3 text-sm leading-6 text-slate-300">
-            <p>Het abonnement wordt aangegaan voor perioden van drie maanden en wordt vooraf betaald. Na iedere periode wordt het abonnement automatisch met drie maanden verlengd.</p>
-            <p>Opzegging dient uiterlijk één maand vóór de eerstvolgende verlengingsdatum door MakeMoreMoney te zijn ontvangen.</p>
+            <p>{subscriptionTerms}</p>
           </div>
           <label className="flex items-start gap-3 text-sm leading-6 text-slate-300">
             <input name="accepted" type="checkbox" required checked={accepted} onChange={(event) => setAccepted(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300" />
@@ -221,9 +220,6 @@ export function AgreementForm() {
           </label>
           <p className="text-sm leading-6 text-slate-400">
             Door op ‘Abonnement en overeenkomst bevestigen’ te klikken, bevestigt u uw gegevens, uw abonnementskeuze en uw akkoord met de Copy Trading Raamovereenkomst MakeMoreMoney.
-          </p>
-          <p className="text-sm leading-6 text-slate-400">
-            Wij bewaren uw naam, e-mailadres, rekeningnummer, abonnementskeuze, getoonde bedragen en beide akkoordverklaringen met documentversie en tijdstip als bewijs van deze overeenkomst.
           </p>
           <button type="submit" disabled={!accepted || !subscriptionAccepted || !subscription || !available || pending} className={`${buttonClass} w-full sm:w-auto`}>
             {pending ? "Akkoord registreren..." : "Abonnement en overeenkomst bevestigen"}
