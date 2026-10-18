@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   agreement, generalTerms, formatAgreementTime, formatSubscriptionAmount, normalizePostcode, positionLabel, subscriptions,
-  subscriptionConsent, subscriptionStrategy, subscriptionVersion, validateAgreement,
+  subscriptionConsent, subscriptionStrategy, subscriptionVersion, validateAgreement, isConfirmationNumber,
 } from "@/lib/agreement";
 
 const inputClass =
@@ -174,7 +174,7 @@ export function AgreementForm() {
       }
       if (typeof result !== "object" || result === null ||
           !("confirmationNumber" in result) || typeof result.confirmationNumber !== "string" ||
-          !/^RUITAB-[0-9]{4}-[0-9]{3,}$/.test(result.confirmationNumber) ||
+          !isConfirmationNumber(result.confirmationNumber) ||
           !("acceptedAt" in result) || typeof result.acceptedAt !== "string") {
         setError("Er is geen geldige ontvangstbevestiging ontvangen. Neem contact op met MakeMoreMoney voordat u opnieuw verzendt.");
         return;
@@ -343,7 +343,9 @@ export function AgreementForm() {
             <span>Ik heb de <a href={generalTerms.path} target="_blank" rel="noopener noreferrer" className="font-bold text-emerald-300 underline! underline-offset-4 hover:text-emerald-200">Algemene Voorwaarden MakeMoreMoney</a> gelezen en ga hiermee akkoord.</span>
           </label>
           <button type="submit" disabled={!accepted || !generalTermsAccepted || !subscriptionAccepted || !subscription || !available || pending} className={`${buttonClass} w-full sm:w-auto`}>
-            {pending ? "Akkoord registreren..." : "Abonnement en overeenkomst bevestigen"}
+            {pending ? "Akkoord registreren..." : subscription
+              ? `Abonnement bevestigen voor ${formatSubscriptionAmount(subscription.quarterly)} per drie maanden`
+              : "Kies eerst het aantal posities"}
           </button>
         </fieldset>
         <noscript><p className="mt-5 text-amber-200">Schakel JavaScript in om de overeenkomst te bekijken en uw akkoord veilig te registreren.</p></noscript>

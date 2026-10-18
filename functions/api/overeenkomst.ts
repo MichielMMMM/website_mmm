@@ -2,7 +2,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import nodemailer from "nodemailer";
 import net from "node:net";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
-import { agreement, generalTerms, formatAgreementTime, formatSubscriptionAmount, subscriptionTerms, validateAgreement } from "../../lib/agreement";
+import { agreement, generalTerms, formatAgreementTime, formatSubscriptionAmount, subscriptionTerms, validateAgreement, confirmationPrefix, isConfirmationNumber } from "../../lib/agreement";
 import type { AgreementInput } from "../../lib/agreement";
 
 type Environment = {
@@ -268,9 +268,9 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
         initials, first_name, last_name, company_name, phone, postcode,
         house_number, house_number_addition, street, city, country, confirmation_year, notes,
         general_terms_name, general_terms_version, general_terms_date, general_terms_consent_text, general_terms_accepted,
-        salutation
+        salutation, confirmation_prefix_base
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending',
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
       validation.data.fullName,
@@ -309,6 +309,7 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
       generalTerms.consentText,
       1,
       validation.data.salutation,
+      confirmationPrefix(validation.data.lastName),
     ).run();
     if (!result.success || result.meta.changes < 1) {
       console.error("agreement_insert_not_confirmed");
@@ -334,7 +335,7 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
     console.error("agreement_email_record_read_failed");
     return json({ message: "Uw registratie is opgeslagen, maar het bevestigingsnummer kon niet worden opgehaald. Neem contact op met MakeMoreMoney en verzend niet opnieuw." }, 503);
   }
-  if (!stored || !/^RUITAB-[0-9]{4}-[0-9]{3,}$/.test(stored.confirmation_number)) {
+  if (!stored || !isConfirmationNumber(stored.confirmation_number)) {
     console.error("agreement_confirmation_number_missing");
     return json({ message: "Uw registratie is opgeslagen, maar het bevestigingsnummer is niet bevestigd. Neem contact op met MakeMoreMoney en verzend niet opnieuw." }, 503);
   }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { once } from "node:events";
@@ -20,6 +20,7 @@ const agreementModuleUrl = `data:text/javascript;base64,${Buffer.from(compiled).
 const {
   agreement, generalTerms, subscriptions, subscriptionStrategy, subscriptionVersion,
   subscriptionConsent, subscriptionTerms, formatAgreementTime, normalizePostcode, formatSubscriptionAmount, validateAgreement,
+  confirmationPrefix, isConfirmationNumber,
 } = await import(agreementModuleUrl);
 const handlerSource = await readFile(path.join(root, "functions", "api", "overeenkomst.ts"), "utf8");
 const handlerCompiled = ts.transpileModule(handlerSource, { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText
@@ -76,6 +77,7 @@ test("validation requires explicit consent, current document and valid fields", 
   for (const fields of [
     { firstName: "  " }, { lastName: "" }, { firstName: "a".repeat(81) },
     { firstName: "Test\nKlant" },
+    { lastName: "123 --" },
     { salutation: "invalid" }, { salutation: null }, { salutation: 1 },
     { postcode: "0000AB" }, { houseNumber: "12A" }, { street: "" }, { city: "" }, { country: "" },
     { initials: "\nA" }, { companyName: "x".repeat(201) }, { phone: "abc" },
@@ -121,6 +123,53 @@ test("exact customer pricing, Dutch amounts and singular consent", () => {
   assert.equal(subscriptionConsent(subscriptions[2]), "Ik bevestig mijn keuze voor Premie Collector Plus – volgsysteem met 3 posities tegen € 50 per maand (€ 150 per drie maanden). Het abonnement wordt voor drie maanden aangegaan en vooraf betaald, wordt daarna telkens automatisch met drie maanden verlengd en kan worden opgezegd tot uiterlijk één maand vóór de eerstvolgende verlengingsdatum.");
   assert.match(subscriptionConsent(subscriptions[0]), /met 1 positie tegen € 25 per maand \(€ 75 per drie maanden\)/);
   assert.match(subscriptionConsent(subscriptions[19]), /met 20 posities tegen € 305 per maand \(€ 915 per drie maanden\)/);
+});
+
+test("surname prefixes persist per email, disambiguate customers and preserve annual counters", async () => {
+  for (const [name, prefix] of [["Mijs", "MIJS"], ["Van Dijk", "VAND"], ["Li", "LI"],
+    ["Éléonore", "ELEO"], ["O'Neil", "ONEI"], ["李", "李"]]) {
+    assert.equal(confirmationPrefix(name), prefix);
+    assert.ok(isConfirmationNumber(`${prefix}2-2026-1000`));
+  }
+  assert.ok(isConfirmationNumber("RUITAB-2026-011"));
+  for (const value of ["-2026-001", "MIJS-26-001", "MIJS-2026-1", "MIJS!-2026-001"]) {
+    assert.equal(isConfirmationNumber(value), false);
+  }
+  const db = new DatabaseSync(":memory:");
+  try {
+    const migrations = (await readdir(path.join(root, "migrations"))).filter(n => n.endsWith(".sql")).sort();
+    for (const name of migrations.filter(n => !n.startsWith("0008"))) {
+      db.exec(await readFile(path.join(root, "migrations", name), "utf8"));
+    }
+    db.exec(`INSERT INTO agreement_acceptances (id,full_name,strategy,strategy_label,
+      document_name,document_version,document_date,consent_text,accepted,accepted_at,confirmation_year)
+      VALUES ('historical','Historical customer','s','s','d','1','date','exact',1,'time',2026)`);
+    const historical = { ...db.prepare("SELECT * FROM agreement_acceptances").get() };
+    db.exec(await readFile(path.join(root, "migrations", "0008_customer_confirmation_prefix.sql"), "utf8"));
+    const { confirmation_prefix_base, ...after } = db.prepare("SELECT * FROM agreement_acceptances").get();
+    assert.equal(confirmation_prefix_base, null);
+    assert.deepEqual(after, historical);
+    const insert = db.prepare(`INSERT INTO agreement_acceptances
+      (id,full_name,strategy,strategy_label,document_name,document_version,document_date,
+      consent_text,accepted,accepted_at,confirmation_year,email,confirmation_prefix_base)
+      VALUES (?,'Test customer','s','s','d','1','date','exact',1,'time',?,?,?)`);
+    const add = (id, email, base, year = 2026) => {
+      insert.run(id, year, email, base);
+      return db.prepare("SELECT confirmation_number FROM agreement_acceptances WHERE id = ?").get(id).confirmation_number;
+    };
+    assert.equal(add("first", "person@example.test", "MIJS"), "MIJS-2026-002");
+    assert.equal(add("repeat", " PERSON@EXAMPLE.TEST ", "MIJS"), "MIJS-2026-003");
+    assert.equal(add("second", "second@example.test", "MIJS"), "MIJS2-2026-004");
+    assert.equal(add("third", "third@example.test", "MIJS"), "MIJS3-2026-005");
+    assert.equal(add("new-year", "second@example.test", "OTHE", 2027), "MIJS2-2027-001");
+    db.exec("BEGIN");
+    add("rolled-back", "rollback@example.test", "MIJS");
+    db.exec("ROLLBACK");
+    assert.equal(add("fourth", "fourth@example.test", "MIJS"), "MIJS4-2026-006");
+    assert.equal(db.prepare("SELECT count(*) AS count FROM agreement_customer_prefixes").get().count, 4);
+  } finally {
+    db.close();
+  }
 });
 
 test("account migration preserves historical evidence and confirmation sequence", async () => {
@@ -525,7 +574,7 @@ test("Cloudflare Function stores real D1 records and rejects invalid or unavaila
     const receipt = await response.json();
     assert.equal(receipt.notificationStatus, "not_configured");
     assert.match(receipt.notificationWarning, /niet opnieuw/);
-    assert.match(receipt.confirmationNumber, /^RUITAB-[0-9]{4}-001$/);
+    assert.match(receipt.confirmationNumber, /^VOOR-[0-9]{4}-001$/);
     assert.equal(receipt.id, undefined);
     assert.ok(Number.isFinite(Date.parse(receipt.acceptedAt)));
     const records = JSON.parse(run([
@@ -576,6 +625,7 @@ test("Cloudflare Function stores real D1 records and rejects invalid or unavaila
       notes: validInput.notes,
       confirmation_year: Number(receipt.confirmationNumber.split("-")[1]),
       confirmation_number: receipt.confirmationNumber,
+      confirmation_prefix_base: "VOOR",
     });
     assert.match(records[0].id, /^[0-9a-f-]{36}$/);
     const concurrent = await Promise.all(Array.from({ length: 8 }, () => post(validInput).then(async (r) => {
@@ -584,6 +634,7 @@ test("Cloudflare Function stores real D1 records and rejects invalid or unavaila
     })));
     const numbers = concurrent.map((r) => r.confirmationNumber);
     assert.equal(new Set(numbers).size, 8, "Concurrent registrations must have unique confirmation numbers");
+    assert.ok(numbers.every(n => n.startsWith("VOOR-")));
     assert.deepEqual(numbers.map((n) => Number(n.split("-")[2])).sort((a, b) => a - b), [2, 3, 4, 5, 6, 7, 8, 9]);
     const clonedInsert = (id, year) => `INSERT INTO agreement_acceptances (
       id, full_name, mexem_account_number, strategy, strategy_label,
@@ -602,7 +653,13 @@ test("Cloudflare Function stores real D1 records and rejects invalid or unavaila
     ]);
     run(["d1", "execute", "AGREEMENTS_DB", "--local", "--config", config, "--persist-to", persist,
       "--command", `UPDATE agreement_confirmation_sequences SET sequence = 999 WHERE year = ${Number(receipt.confirmationNumber.split("-")[1])}`]);
-    assert.match((await (await post(validInput)).json()).confirmationNumber, /^RUITAB-[0-9]{4}-1000$/);
+    assert.match((await (await post(validInput)).json()).confirmationNumber, /^VOOR-[0-9]{4}-1000$/);
+    const differentCustomers = await Promise.all(Array.from({ length: 4 }, (_, index) =>
+      post({ ...validInput, email: `other${index}@example.test` }).then(async response => {
+        assert.equal(response.status, 201);
+        return (await response.json()).confirmationNumber.split("-")[0];
+      })));
+    assert.deepEqual(differentCustomers.sort(), ["VOOR2", "VOOR3", "VOOR4", "VOOR5"]);
     run(["d1", "execute", "AGREEMENTS_DB", "--local", "--config", config, "--persist-to", persist,
       "--command", "DROP TABLE agreement_acceptances"]);
     assert.equal((await post(validInput)).status, 503, "Storage errors must not report success");

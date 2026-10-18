@@ -117,6 +117,9 @@ Het formulier verifieert niet de identiteit of het bestaande klant-/rekeningbezi
    de optionele aanhefkeuze. Historische registraties behouden NULL; nieuwe
    formulieren kiezen standaard `neutraal`. Een ontbrekende keuze in een reeds
    geopend formulier wordt als neutraal verwerkt, ongeldige waarden worden afgewezen.
+   Voer `migrations/0008_customer_confirmation_prefix.sql` atomair eenmaal uit
+   voor deployment van de achternaamprefix. Bestaande nummers en de jaarteller
+   blijven ongewijzigd. De nieuwe tabel koppelt e-mailadressen aan vaste prefixes.
 4. Koppel bij **Workers & Pages > website-mmm > Settings > Bindings** een
    D1-database met bindingsnaam **AGREEMENTS_DB**. Koppel preview aan een aparte
    testdatabase als previews moeten kunnen registreren; gebruik daar niet de
@@ -150,11 +153,22 @@ Nieuwe registraties bewaren voorletters, voornaam en achternaam afzonderlijk, me
 samengestelde volledige naam (zonder dubbele spaties), optionele bedrijfsnaam en
 telefoon, factuuradres en optionele opmerkingen (maximaal 2000 tekens).
 De UUID blijft intern. Een database-trigger kent binnen dezelfde insert-transactie
-een uniek `RUITAB-[JAAR]-[VOLGNUMMER]` toe via een jaarteller met een unieke index.
+een uniek `[KLANTPREFIX]-[JAAR]-[VOLGNUMMER]` toe via een jaarteller met een unieke index.
+De basisprefix bestaat uit maximaal vier hoofdletters van de achternaam:
+spaties/leestekens vervallen en diakritische tekens worden genormaliseerd.
+E-mailadressen worden voor deze koppeling getrimd en naar kleine letters omgezet.
+De eerste klant krijgt bijvoorbeeld MIJS; andere e-mailadressen met dezelfde
+basisprefix krijgen MIJS2, MIJS3 enzovoort. Dezelfde e-mail behoudt de toegewezen
+prefix, ook na een naamswijziging of jaarwisseling. Toekenning van klantprefix en
+volgnummer gebeurt atomair binnen de insert-trigger, ook bij gelijktijdige inzendingen.
+Historische RUITAB-nummers blijven geldig en worden niet hernummerd.
+De bevestigingsknop toont het gekozen driemaandstarief, bijvoorbeeld
+"Abonnement bevestigen voor € 150 per drie maanden". Zonder abonnementskeuze
+blijft de knop uitgeschakeld met "Kies eerst het aantal posities".
 Het jaar wordt server-side in Europe/Amsterdam bepaald; minimaal drie cijfers,
 zonder maximum van 999. Gelijktijdige inserts worden door SQLite geserialiseerd.
 De klant-API, het bevestigingsscherm en de mail gebruiken uitsluitend dit opgeslagen
-RUITAB-nummer. Datumweergave: `18-10-2026 om 13:59`; intern blijft de exacte UTC-timestamp.
+bevestigingsnummer. Datumweergave: `18-10-2026 om 13:59`; intern blijft de exacte UTC-timestamp.
 
 ### Zelfstandige adrescontrole
 
@@ -182,7 +196,7 @@ er bestaat geen IBKR- of MEXEM-lookup.
 Na een bevestigde insert stuurt de Function via Hostnet SMTP een
 tekstmail naar het opgeslagen e-mailadres van de klant, met een blinde kopie aan
 **info@makemoremoney.nl**. De Function leest de registratie terug uit D1 en gebruikt de
-opgeslagen voornaam, factuurgegevens, bedragen, documentgegevens, tijdstip en RUITAB-nummer.
+opgeslagen naam, factuurgegevens, bedragen, documentgegevens, tijdstip en bevestigingsnummer.
 De compacte klantmail toont geen UUID of letterlijke checkboxteksten; deze blijven
 wel ongewijzigd in D1 opgeslagen. Ingevulde opmerkingen worden ook vermeld.
 Het onderwerp is **Bevestiging MakeMoreMoney-abonnement en overeenkomst**.

@@ -63,6 +63,15 @@ export function normalizePostcode(value: string) {
     ? `${compact.slice(0, 4)} ${compact.slice(4)}` : value.trim().toUpperCase();
 }
 
+export function confirmationPrefix(lastName: string) {
+  return Array.from(lastName.normalize("NFKD").replace(/\p{M}/gu, "")
+    .toUpperCase().replace(/[^\p{L}]/gu, "")).slice(0, 4).join("");
+}
+
+export function isConfirmationNumber(value: string) {
+  return /^(?:\p{L}{1,4}[0-9]*|RUITAB)-[0-9]{4}-[0-9]{3,}$/u.test(value);
+}
+
 export function formatAgreementTime(timestamp: string) {
   const parts = new Intl.DateTimeFormat("nl-NL", {
     day: "2-digit", month: "2-digit", year: "numeric",
@@ -170,6 +179,9 @@ export function validateAgreement(value: unknown):
   const initials = value.initials.trim().replace(/\s+/g, " ");
   const firstName = value.firstName.trim().replace(/\s+/g, " ");
   const lastName = value.lastName.trim().replace(/\s+/g, " ");
+  if (!confirmationPrefix(lastName)) {
+    return { valid: false, message: "Vul een achternaam met letters in." };
+  }
   const fullName = [initials, firstName, lastName].filter(Boolean).join(" ");
   const country = value.country.trim();
   const dutch = country.toLowerCase() === "nederland";
