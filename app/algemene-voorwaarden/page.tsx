@@ -163,9 +163,6 @@ export default function AlgemeneVoorwaardenPage() {
                     )}
                   </p>
                 ))}
-                {index === articles.length - 1 && (
-                  <p>E-mail: <a href="mailto:michiel@mijs.nl" className="text-emerald-300 underline underline-offset-4 hover:text-emerald-200">michiel@mijs.nl</a></p>
-                )}
               </div>
             </section>
           ))}
