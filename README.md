@@ -173,8 +173,8 @@ bevestigingsnummer. Datumweergave: `18-10-2026 om 13:59`; intern blijft de exact
 ### Zelfstandige adrescontrole
 
 Bij het verlaten van postcode, huisnummer of toevoeging (ook via Tab) start de
-adrescontrole zodra postcode en huisnummer geldig zijn. De knop **Adres controleren**
-blijft beschikbaar voor een nieuwe poging. De controle verstuurt alleen postcode, huisnummer en eventuele
+adrescontrole automatisch zodra postcode en huisnummer geldig zijn, zonder aparte knop.
+De controle verstuurt alleen postcode, huisnummer en eventuele
 toevoeging via een same-origin JSON-POST naar `/api/postcode`. De Function vraagt
 PDOK Locatieserver (BAG-adressen) op. Met toevoeging moet deze exact overeenkomen.
 Zonder toevoeging mogen meerdere resultaten dezelfde straat en woonplaats hebben:

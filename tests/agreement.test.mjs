@@ -278,6 +278,7 @@ test("built HTML has exact robots directive and no discoverable links or sitemap
   assert.match(html, /U hoeft deze koppeling niet opnieuw uit te voeren/);
   assert.ok(html.replace(/<[^>]*>/g, "").includes(agreement.consentText));
   assert.doesNotMatch(html, /Copy Trading Raamovereenkomst bekijken/);
+  assert.doesNotMatch(html, /<button\b[^>]*>Adres controleren/);
   assert.doesNotMatch(html, /Door op ‘Abonnement en overeenkomst bevestigen’ te klikken/);
   for (const documentPath of [agreement.documentPath, generalTerms.path]) {
     const link = [...html.matchAll(/<a\b[^>]*>/g)].map((match) => match[0])

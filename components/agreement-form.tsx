@@ -272,14 +272,9 @@ export function AgreementForm() {
             </div>
           </div>
           {country.trim().toLowerCase() === "nederland" && (
-            <div>
-              <button type="button" disabled={addressPending || !postcode.trim() || !houseNumber.trim()} onClick={() => void lookupAddress()} className={buttonClass}>
-                {addressPending ? "Adres controleren..." : "Adres controleren"}
-              </button>
-              <p className="mt-2 text-sm text-slate-400">Via PDOK, op basis van postcode en huisnummer. U kunt het adres ook handmatig invullen.</p>
-            </div>
+            <p className="text-sm text-slate-400">Via PDOK, op basis van postcode en huisnummer. U kunt het adres ook handmatig invullen.</p>
           )}
-          {addressMessage && <p role="status" className="text-sm text-slate-300">{addressMessage}</p>}
+          {(addressPending || addressMessage) && <p role="status" className="text-sm text-slate-300">{addressPending ? "Adres wordt automatisch gecontroleerd..." : addressMessage}</p>}
           <div>
             <label htmlFor="agreement-street" className="mb-2 block text-sm text-slate-300">Straat</label>
             <input id="agreement-street" name="street" autoComplete="address-line1" required maxLength={150} value={street} onChange={(event) => { addressRequest.current?.abort(); setAddressPending(false); setStreet(event.target.value); }} className={inputClass} />
