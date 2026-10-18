@@ -138,9 +138,14 @@ RUITAB-nummer. Datumweergave: `18-10-2026 om 13:59`; intern blijft de exacte UTC
 
 ### Zelfstandige adrescontrole
 
-De knop **Adres controleren** verstuurt alleen postcode, huisnummer en eventuele
+Bij het verlaten van postcode, huisnummer of toevoeging (ook via Tab) start de
+adrescontrole zodra postcode en huisnummer geldig zijn. De knop **Adres controleren**
+blijft beschikbaar voor een nieuwe poging. De controle verstuurt alleen postcode, huisnummer en eventuele
 toevoeging via een same-origin JSON-POST naar `/api/postcode`. De Function vraagt
-PDOK Locatieserver (BAG-adressen) op en accepteert alleen een exacte, eenduidige match.
+PDOK Locatieserver (BAG-adressen) op. Met toevoeging moet deze exact overeenkomen.
+Zonder toevoeging mogen meerdere resultaten dezelfde straat en woonplaats hebben:
+alleen deze twee velden worden ingevuld, nooit een verzonnen toevoeging.
+Bij verschillende straten/woonplaatsen of onvolledige resultaten blijft handmatige invoer nodig.
 Er is geen API-key, extra account of environment variable nodig. Postcodes worden
 voor Nederland bij opslag genormaliseerd naar `1234 AB`. Buitenlandse postcodes
 worden niet bij PDOK opgezocht. Straat en woonplaats blijven bewerkbaar en verplicht;

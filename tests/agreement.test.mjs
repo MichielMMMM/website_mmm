@@ -141,6 +141,18 @@ test("independent PDOK lookup matches postcode, number and addition and permits 
   assert.deepEqual(await (await request(input)).json(), { found: true, street: "Spui", city: "'s-Gravenhage" });
   assert.equal((await (await request({ ...input, addition: "a" })).json()).found, true);
   assert.equal((await (await request({ ...input, addition: "Z" })).json()).found, false);
+  providerResult = { response: { docs: [
+    { postcode: "2511BT", huisnummer: 68, huisletter: "A", straatnaam: "Spui", woonplaatsnaam: "'s-Gravenhage" },
+    { postcode: "2511BT", huisnummer: 68, huisletter: "C", straatnaam: "Spui", woonplaatsnaam: "'s-Gravenhage" },
+  ] } };
+  assert.deepEqual(await (await request(input)).json(), { found: true, street: "Spui", city: "'s-Gravenhage" });
+  providerResult.response.docs[1].straatnaam = "Andere straat";
+  assert.equal((await (await request(input)).json()).found, false);
+  assert.equal((await (await request({ ...input, addition: "A" })).json()).found, true);
+  providerResult = { response: { numFound: 101, docs: [
+    { postcode: "2511BT", huisnummer: 68, straatnaam: "Spui", woonplaatsnaam: "'s-Gravenhage" },
+  ] } };
+  assert.equal((await (await request(input)).json()).found, false);
   providerResult = { response: { docs: [] } };
   assert.equal((await (await request(input)).json()).found, false);
   providerResult = { unexpected: [] };
@@ -165,6 +177,7 @@ test("built HTML has exact robots directive and no discoverable links or sitemap
   assert.doesNotMatch(html, /Het document opent in een nieuw tabblad/);
   assert.match(html, /U hoeft deze koppeling niet opnieuw uit te voeren/);
   assert.ok(html.includes(agreement.consentText));
+  assert.doesNotMatch(html, /<p[^>]*>Versie /);
   assert.ok(!html.includes(subscriptionTerms));
   assert.doesNotMatch(html, /Wij bewaren uw naam/);
   assert.doesNotMatch(html, /Het abonnement wordt per drie maanden vooruitbetaald\./);

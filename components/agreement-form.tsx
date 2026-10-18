@@ -74,6 +74,9 @@ export function AgreementForm() {
   useEffect(() => () => addressRequest.current?.abort(), []);
 
   async function lookupAddress() {
+    if (country.trim().toLowerCase() !== "nederland" ||
+        !/^[1-9][0-9]{3} [A-Z]{2}$/.test(normalizePostcode(postcode)) ||
+        !/^[1-9][0-9]{0,9}$/.test(houseNumber.trim())) return;
     addressRequest.current?.abort();
     const controller = new AbortController();
     addressRequest.current = controller;
@@ -214,9 +217,8 @@ export function AgreementForm() {
           Copy Trading Raamovereenkomst bekijken
         </span>
       )}
-      <p className="mb-8 mt-3 text-sm text-slate-400">Versie {agreement.version} van {agreement.date}.</p>
 
-      <form onSubmit={submit} method="post" action="/api/overeenkomst" aria-busy={loading || pending} className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 sm:p-8">
+      <form onSubmit={submit} method="post" action="/api/overeenkomst" aria-busy={loading || pending} className="mt-8 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 sm:p-8">
         <h2 className="mb-6 text-2xl font-bold text-white">Uw gegevens en abonnement</h2>
         {loading && <p role="status" className="mb-5 text-slate-300">Beschikbaarheid controleren...</p>}
         {error && (
@@ -254,18 +256,18 @@ export function AgreementForm() {
             <input id="agreement-phone" name="phone" type="tel" autoComplete="tel" maxLength={40} className={inputClass} />
           </div>
           <h3 className="text-lg font-bold text-white">Factuuradres</h3>
-          <div className="grid gap-5 sm:grid-cols-3">
+          <div className="grid items-end gap-5 sm:grid-cols-3">
             <div>
               <label htmlFor="agreement-postcode" className="mb-2 block text-sm text-slate-300">Postcode</label>
-              <input id="agreement-postcode" name="postcode" autoComplete="postal-code" required maxLength={20} value={postcode} onChange={(event) => { resetAddressLookup(); setPostcode(event.target.value); }} onBlur={() => { if (country.trim().toLowerCase() === "nederland") setPostcode(normalizePostcode(postcode)); }} className={inputClass} />
+              <input id="agreement-postcode" name="postcode" autoComplete="postal-code" required maxLength={20} value={postcode} onChange={(event) => { resetAddressLookup(); setPostcode(event.target.value); }} onBlur={() => { if (country.trim().toLowerCase() === "nederland") setPostcode(normalizePostcode(postcode)); void lookupAddress(); }} className={inputClass} />
             </div>
             <div>
               <label htmlFor="agreement-house-number" className="mb-2 block text-sm text-slate-300">Huisnummer</label>
-              <input id="agreement-house-number" name="houseNumber" required inputMode="numeric" pattern="[1-9][0-9]{0,9}" maxLength={10} value={houseNumber} onChange={(event) => { resetAddressLookup(); setHouseNumber(event.target.value); }} className={inputClass} />
+              <input id="agreement-house-number" name="houseNumber" required inputMode="numeric" pattern="[1-9][0-9]{0,9}" maxLength={10} value={houseNumber} onChange={(event) => { resetAddressLookup(); setHouseNumber(event.target.value); }} onBlur={() => void lookupAddress()} className={inputClass} />
             </div>
             <div>
               <label htmlFor="agreement-addition" className="mb-2 block text-sm text-slate-300">Huisnummertoevoeging (optioneel)</label>
-              <input id="agreement-addition" name="houseNumberAddition" maxLength={20} value={addition} onChange={(event) => { resetAddressLookup(); setAddition(event.target.value); }} className={inputClass} />
+              <input id="agreement-addition" name="houseNumberAddition" maxLength={20} value={addition} onChange={(event) => { resetAddressLookup(); setAddition(event.target.value); }} onBlur={() => void lookupAddress()} className={inputClass} />
             </div>
           </div>
           {country.trim().toLowerCase() === "nederland" && (

@@ -70,15 +70,26 @@ export async function onRequest({ request }: { request: Request }) {
           !("huisnummer" in doc) || String(doc.huisnummer) !== houseNumber) return false;
       const letter = "huisletter" in doc && doc.huisletter != null ? String(doc.huisletter) : "";
       const suffix = "huisnummertoevoeging" in doc && doc.huisnummertoevoeging != null ? String(doc.huisnummertoevoeging) : "";
-      return `${letter}${suffix}`.toUpperCase().replace(/[ -]/g, "") === addition.replace(/[ -]/g, "");
+      return !addition || `${letter}${suffix}`.toUpperCase().replace(/[ -]/g, "") === addition.replace(/[ -]/g, "");
     });
-    const doc: unknown = matches.length === 1 ? matches[0] : null;
-    if (typeof doc !== "object" || doc === null ||
-        !("straatnaam" in doc) || typeof doc.straatnaam !== "string" ||
-        !("woonplaatsnaam" in doc) || typeof doc.woonplaatsnaam !== "string") {
+    const addresses = new Map<string, { street: string; city: string }>();
+    for (const match of matches) {
+      if (typeof match !== "object" || match === null ||
+          !("straatnaam" in match) || typeof match.straatnaam !== "string" ||
+          !("woonplaatsnaam" in match) || typeof match.woonplaatsnaam !== "string") {
+        return json({ found: false, message: "Geen eenduidig adres gevonden. Vul straat en woonplaats handmatig in." });
+      }
+      addresses.set(JSON.stringify([match.straatnaam, match.woonplaatsnaam]), {
+        street: match.straatnaam, city: match.woonplaatsnaam,
+      });
+    }
+    const truncated = "numFound" in data.response && typeof data.response.numFound === "number" &&
+      data.response.numFound > data.response.docs.length;
+    const address = !truncated && addresses.size === 1 ? addresses.values().next().value : undefined;
+    if (!address) {
       return json({ found: false, message: "Geen eenduidig adres gevonden. Vul straat en woonplaats handmatig in." });
     }
-    return json({ found: true, street: doc.straatnaam, city: doc.woonplaatsnaam });
+    return json({ found: true, ...address });
   } catch {
     console.error("agreement_postcode_lookup_failed");
     return json({ message: "Adrescontrole is tijdelijk niet beschikbaar. Vul straat en woonplaats handmatig in." }, 503);
