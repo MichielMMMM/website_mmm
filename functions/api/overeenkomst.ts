@@ -18,12 +18,13 @@ async function notifyOwner(env: Environment, data: AgreementInput, id: string, a
     return "not_configured";
   }
   const transport = nodemailer.createTransport({
-    host: "smtp.hostnet.nl",
+    // Use the canonical DNS target: Workers can return the SMTP alias as an IP.
+    host: "mail.hostnet.nl",
     port: 587,
     secure: false,
     requireTLS: true,
     auth: { user: notificationSender, pass: env.SMTP_PASSWORD },
-    tls: { minVersion: "TLSv1.2", rejectUnauthorized: true },
+    tls: { servername: "smtp.hostnet.nl", minVersion: "TLSv1.2", rejectUnauthorized: true },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 15000,

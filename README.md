@@ -131,7 +131,9 @@ De mail bevat persoonsgegevens: beveilig ook de ontvangende mailbox en neem
 deze verwerking mee in uw privacy- en bewaarbeleid.
 
 Afzender en SMTP-login zijn **michiel2@mijs.nl**; ontvanger is **michiel@mijs.nl**. De Function gebruikt
-`smtp.hostnet.nl:587`, verplichte STARTTLS en certificaatcontrole. Het adres
+`mail.hostnet.nl:587` (het canonieke DNS-doel van `smtp.hostnet.nl`), verplichte STARTTLS
+en certificaatcontrole voor `smtp.hostnet.nl`. Dit vermijdt een DNS-aliasfout in de
+Cloudflare-runtime, zonder IP-adressen vast te zetten of TLS-controle uit te schakelen. Het adres
 `mailout.hostnet.nl` voor Hostnet-webhosting wordt niet gebruikt voor deze extern
 gehoste Cloudflare-app. Er is geen Cloudflare Email Sending-abonnement nodig.
 

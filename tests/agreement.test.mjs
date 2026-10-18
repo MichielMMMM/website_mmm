@@ -135,10 +135,11 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
     let stored = false;
     let status;
     context.mock.method(nodemailer, "createTransport", (options) => {
-      assert.equal(options.host, "smtp.hostnet.nl");
+      assert.equal(options.host, "mail.hostnet.nl");
       assert.equal(options.port, 587);
       assert.equal(options.requireTLS, true);
       assert.equal(options.tls.rejectUnauthorized, true);
+      assert.equal(options.tls.servername, "smtp.hostnet.nl");
       assert.equal(options.auth.user, "michiel2@mijs.nl");
       assert.equal(options.auth.pass, "test-password");
       return { close() {}, async sendMail(message) {
