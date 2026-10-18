@@ -2,7 +2,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import nodemailer from "nodemailer";
 import net from "node:net";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
-import { agreement, formatSubscriptionAmount, subscriptionTerms, validateAgreement } from "../../lib/agreement";
+import { agreement, formatAgreementTime, formatSubscriptionAmount, subscriptionTerms, validateAgreement } from "../../lib/agreement";
 
 type Environment = {
   AGREEMENTS_DB?: D1Database;
@@ -16,6 +16,16 @@ const notificationSender = "michiel2@mijs.nl";
 type StoredAgreement = {
   id: string;
   full_name: string;
+  first_name: string;
+  company_name: string;
+  street: string;
+  house_number: string;
+  house_number_addition: string;
+  postcode: string;
+  city: string;
+  country: string;
+  notes: string;
+  confirmation_number: string;
   email: string;
   strategy_label: string;
   positions: number;
@@ -77,27 +87,34 @@ async function notifyCustomer(env: Environment, data: StoredAgreement) {
           from: { name: "Make More Money", address: notificationSender },
           subject: "Bevestiging MakeMoreMoney-abonnement en overeenkomst",
           text: [
-            `Beste ${data.full_name},`,
-            "Bedankt voor uw bevestiging.",
-            "Hierbij bevestigen wij uw abonnement op:",
-            data.strategy_label,
-            "Uw abonnementsgegevens:",
+            `Beste ${data.first_name},`,
+            "Bedankt voor uw bevestiging. Hieronder vindt u de gegevens van uw abonnement en overeenkomst.",
+            "UW ABONNEMENT",
             [
+              `Strategie: ${data.strategy_label}`,
               `Aantal posities: ${data.positions}`,
               `Indicatief benodigd kapitaal: ${formatSubscriptionAmount(data.indicative_capital)}`,
               `Abonnementskosten: ${formatSubscriptionAmount(data.monthly_rate)} per maand`,
               `Te betalen: ${formatSubscriptionAmount(data.quarterly_rate)} per drie maanden`,
             ].join("\n"),
             subscriptionTerms,
-            "U heeft daarnaast akkoord gegeven op:",
-            `${data.document_name}\nVersie ${data.document_version} van ${data.document_date}`,
-            `Datum en tijd van akkoord:\n${new Intl.DateTimeFormat("nl-NL", {
-              dateStyle: "long", timeStyle: "long", timeZone: "Europe/Amsterdam",
-            }).format(new Date(data.accepted_at))}`,
-            `Registratienummer:\n${data.id}`,
-            `Uw bevestiging:\n“${data.subscription_consent_text}”`,
-            `U heeft eveneens bevestigd:\n“${data.consent_text}”`,
-            "Aan uw bestaande MEXEM/TradeConnector-koppeling verandert niets.",
+            "FACTUURGEGEVENS",
+            [
+              ...(data.company_name ? [data.company_name] : []),
+              data.full_name,
+              `${data.street} ${data.house_number}${data.house_number_addition}`,
+              `${data.postcode} ${data.city}`,
+              data.country,
+            ].join("\n"),
+            ...(data.notes ? ["AANVULLENDE INFORMATIE", data.notes] : []),
+            "UW OVEREENKOMST",
+            `U heeft akkoord gegeven op de ${data.document_name}.`,
+            [
+              `Documentversie: ${data.document_version}`,
+              `Documentdatum: ${data.document_date}`,
+              `Datum akkoord: ${formatAgreementTime(data.accepted_at)}`,
+              `Bevestigingsnummer: ${data.confirmation_number}`,
+            ].join("\n"),
             "Met vriendelijke groet,",
             "MakeMoreMoney",
           ].join("\n\n"),
@@ -154,7 +171,7 @@ async function readPayload(request: Request): Promise<unknown> {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > 8192) {
+    if (size > 16384) {
       await reader.cancel();
       throw new Error("body_too_large");
     }
@@ -183,7 +200,7 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
     if (request.headers.get("Content-Type")?.split(";")[0].trim() !== "application/json") {
       return json({ message: "Ongeldig formulierformaat." }, 415);
     }
-    if (Number(request.headers.get("Content-Length")) > 8192) {
+    if (Number(request.headers.get("Content-Length")) > 16384) {
       return json({ message: "De inzending is te groot." }, 413);
     }
   }
@@ -216,14 +233,20 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
 
   const id = crypto.randomUUID();
   const acceptedAt = new Date().toISOString();
+  const confirmationYear = Number(new Intl.DateTimeFormat("en", {
+    year: "numeric", timeZone: "Europe/Amsterdam",
+  }).format(new Date(acceptedAt)));
   try {
     const result = await database.prepare(`
       INSERT INTO agreement_acceptances (
         id, full_name, mexem_account_number, strategy, strategy_label,
         document_name, document_version, document_date, consent_text, accepted, accepted_at,
         email, positions, indicative_capital, monthly_rate, quarterly_rate,
-        subscription_consent_text, subscription_accepted, subscription_version, notification_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+        subscription_consent_text, subscription_accepted, subscription_version, notification_status,
+        initials, first_name, last_name, company_name, phone, postcode,
+        house_number, house_number_addition, street, city, country, confirmation_year, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending',
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
       validation.data.fullName,
@@ -244,8 +267,21 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
       validation.data.subscriptionConsentText,
       1,
       validation.data.subscriptionVersion,
+      validation.data.initials,
+      validation.data.firstName,
+      validation.data.lastName,
+      validation.data.companyName,
+      validation.data.phone,
+      validation.data.postcode,
+      validation.data.houseNumber,
+      validation.data.houseNumberAddition,
+      validation.data.street,
+      validation.data.city,
+      validation.data.country,
+      confirmationYear,
+      validation.data.notes,
     ).run();
-    if (!result.success || result.meta.changes !== 1) {
+    if (!result.success || result.meta.changes < 1) {
       console.error("agreement_insert_not_confirmed");
       return json({ message: "De registratie is niet bevestigd. Neem contact op met MakeMoreMoney." }, 503);
     }
@@ -255,21 +291,24 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
   }
 
   let notificationStatus = "failed";
+  let stored: StoredAgreement | null;
   try {
-    const stored = await database.prepare(`
+    stored = await database.prepare(`
       SELECT id, full_name, email, strategy_label, positions, indicative_capital,
         monthly_rate, quarterly_rate, document_name, document_version, document_date,
-        consent_text, subscription_consent_text, accepted_at
+        consent_text, subscription_consent_text, accepted_at, first_name, company_name,
+        street, house_number, house_number_addition, postcode, city, country, confirmation_number, notes
       FROM agreement_acceptances WHERE id = ?
     `).bind(id).first<StoredAgreement>();
-    if (!stored) {
-      console.error("agreement_email_record_missing");
-    } else {
-      notificationStatus = await notifyCustomer(env, stored);
-    }
   } catch {
     console.error("agreement_email_record_read_failed");
+    return json({ message: "Uw registratie is opgeslagen, maar het bevestigingsnummer kon niet worden opgehaald. Neem contact op met MakeMoreMoney en verzend niet opnieuw." }, 503);
   }
+  if (!stored || !/^RUITAB-[0-9]{4}-[0-9]{3,}$/.test(stored.confirmation_number)) {
+    console.error("agreement_confirmation_number_missing");
+    return json({ message: "Uw registratie is opgeslagen, maar het bevestigingsnummer is niet bevestigd. Neem contact op met MakeMoreMoney en verzend niet opnieuw." }, 503);
+  }
+  notificationStatus = await notifyCustomer(env, stored);
   let notificationRecorded = false;
   try {
     const result = await database.prepare(`
@@ -284,5 +323,5 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
     notificationStatus !== "queued"
     ? "Uw registratie is opgeslagen, maar de verzending van uw bevestigingsmail of de kopie aan MakeMoreMoney is niet bevestigd. Verzend het formulier niet opnieuw."
     : undefined;
-  return json({ id, acceptedAt, notificationStatus, notificationWarning }, 201);
+  return json({ confirmationNumber: stored.confirmation_number, acceptedAt, notificationStatus, notificationWarning }, 201);
 }

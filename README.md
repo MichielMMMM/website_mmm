@@ -101,6 +101,10 @@ Het formulier verifieert niet de identiteit of het bestaande klant-/rekeningbezi
    Voer vervolgens ook
    `npx wrangler d1 execute mmm-agreements --remote --file migrations/0003_agreement_notifications.sql`
    eenmaal uit voor de e-mailstatusvelden. Oude registraties worden niet achteraf gemaild.
+   Voer voor de factuurvelden en bevestigingsnummers ook
+   `npx wrangler d1 execute mmm-agreements --remote --file migrations/0004_customer_billing.sql`
+   eenmaal uit **voor** deployment. Oude rijen krijgen geen verzonnen namen, adressen
+   of bevestigingsnummers: de nieuwe kolommen blijven daar NULL.
 4. Koppel bij **Workers & Pages > website-mmm > Settings > Bindings** een
    D1-database met bindingsnaam **AGREEMENTS_DB**. Koppel preview aan een aparte
    testdatabase als previews moeten kunnen registreren; gebruik daar niet de
@@ -109,7 +113,7 @@ Het formulier verifieert niet de identiteit of het bestaande klant-/rekeningbezi
    buildopdracht `npx next build` en outputmap `out` blijven gelijk.
    De map `functions` in de repositoryroot wordt door Pages afzonderlijk
    verwerkt; alleen `out` uploaden met drag-and-drop is niet voldoende.
-   `public/_routes.json` beperkt Function-aanroepen tot `/api/overeenkomst`.
+   `public/_routes.json` beperkt Function-aanroepen tot `/api/overeenkomst` en `/api/postcode`.
    Controleer na deployment de pagina en een geautoriseerde testinzending in D1.
 
 Inzendingen worden in D1-tabel `agreement_acceptances` opgeslagen. Elke rij bevat
@@ -122,13 +126,39 @@ uitsluitend na een bevestigde database-insert. Er wordt geen naam, rekeningnumme
 IP-adres of user-agent naar applicatielogs geschreven of via de URL verstuurd.
 Er is geen publieke API voor het uitlezen van akkoorden.
 
+Nieuwe registraties bewaren voorletters, voornaam en achternaam afzonderlijk, met een
+samengestelde volledige naam (zonder dubbele spaties), optionele bedrijfsnaam en
+telefoon, factuuradres en optionele opmerkingen (maximaal 2000 tekens).
+De UUID blijft intern. Een database-trigger kent binnen dezelfde insert-transactie
+een uniek `RUITAB-[JAAR]-[VOLGNUMMER]` toe via een jaarteller met een unieke index.
+Het jaar wordt server-side in Europe/Amsterdam bepaald; minimaal drie cijfers,
+zonder maximum van 999. Gelijktijdige inserts worden door SQLite geserialiseerd.
+De klant-API, het bevestigingsscherm en de mail gebruiken uitsluitend dit opgeslagen
+RUITAB-nummer. Datumweergave: `18-10-2026 om 13:59`; intern blijft de exacte UTC-timestamp.
+
+### Zelfstandige adrescontrole
+
+De knop **Adres controleren** verstuurt alleen postcode, huisnummer en eventuele
+toevoeging via een same-origin JSON-POST naar `/api/postcode`. De Function vraagt
+PDOK Locatieserver (BAG-adressen) op en accepteert alleen een exacte, eenduidige match.
+Er is geen API-key, extra account of environment variable nodig. Postcodes worden
+voor Nederland bij opslag genormaliseerd naar `1234 AB`. Buitenlandse postcodes
+worden niet bij PDOK opgezocht. Straat en woonplaats blijven bewerkbaar en verplicht;
+bij geen resultaat, time-out of storing blijft handmatige invoer mogelijk.
+Er worden geen persoonsgegevens gelogd; alleen het adresdeel wordt aan PDOK verzonden,
+geen naam, e-mailadres of rekeningnummer. Neem dit op in het privacybeleid.
+Deze implementatie staat volledig op zichzelf: geen code, configuratie of sleutels
+uit Facturatie en geen afhankelijkheid van dat project. Het U-nummer wordt uitsluitend
+lokaal op formaat gecontroleerd; er bestaat geen IBKR- of MEXEM-lookup.
+
 ### Bevestigingsmail aan de klant
 
 Na een bevestigde insert stuurt de Function via Hostnet SMTP een
 tekstmail naar het opgeslagen e-mailadres van de klant, met een blinde kopie aan
 **michiel@mijs.nl**. De Function leest de registratie terug uit D1 en gebruikt de
-opgeslagen bedragen, documentgegevens, tijdstip, registratie-ID en beide exacte
-akkoordverklaringen, niet opnieuw gegenereerde akkoordteksten uit de actuele prijstabel.
+opgeslagen voornaam, factuurgegevens, bedragen, documentgegevens, tijdstip en RUITAB-nummer.
+De compacte klantmail toont geen UUID of letterlijke checkboxteksten; deze blijven
+wel ongewijzigd in D1 opgeslagen. Ingevulde opmerkingen worden ook vermeld.
 Het onderwerp is **Bevestiging MakeMoreMoney-abonnement en overeenkomst**.
 De mail bevat persoonsgegevens: beveilig ook de ontvangende mailbox en neem
 deze verwerking mee in uw privacy- en bewaarbeleid.

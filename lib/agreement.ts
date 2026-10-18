@@ -48,9 +48,36 @@ export function subscriptionConsent(subscription: Subscription) {
   return `Ik bevestig mijn keuze voor ${subscriptionStrategy} met ${positionLabel(subscription.positions)} tegen ${formatSubscriptionAmount(subscription.monthly)} per maand (${formatSubscriptionAmount(subscription.quarterly)} per drie maanden). Het abonnement wordt voor drie maanden aangegaan en vooraf betaald, wordt daarna telkens automatisch met drie maanden verlengd en kan worden opgezegd tot uiterlijk één maand vóór de eerstvolgende verlengingsdatum.`;
 }
 
+export function normalizePostcode(value: string) {
+  const compact = value.replace(/\s/g, "").toUpperCase();
+  return /^[1-9][0-9]{3}[A-Z]{2}$/.test(compact)
+    ? `${compact.slice(0, 4)} ${compact.slice(4)}` : value.trim().toUpperCase();
+}
+
+export function formatAgreementTime(timestamp: string) {
+  const parts = new Intl.DateTimeFormat("nl-NL", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Europe/Amsterdam",
+  }).formatToParts(new Date(timestamp));
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
+  return `${get("day")}-${get("month")}-${get("year")} om ${get("hour")}:${get("minute")}`;
+}
+
 export type AgreementInput = {
+  initials: string;
+  firstName: string;
+  lastName: string;
   fullName: string;
+  companyName: string;
   email: string;
+  phone: string;
+  postcode: string;
+  houseNumber: string;
+  houseNumberAddition: string;
+  street: string;
+  city: string;
+  country: string;
+  notes: string;
   accountNumber: string;
   strategy: string;
   positions: number;
@@ -83,12 +110,60 @@ export function validateAgreement(value: unknown):
     return { valid: false, message: "De overeenkomst is gewijzigd. Vernieuw de pagina en lees de huidige versie." };
   }
 
-  if (!("fullName" in value) || typeof value.fullName !== "string") {
-    return { valid: false, message: "Vul uw volledige naam in." };
+  const billingFields = [
+    ["initials", "voorletters", false, 30],
+    ["firstName", "voornaam", true, 80],
+    ["lastName", "achternaam", true, 80],
+    ["companyName", "bedrijfsnaam", false, 200],
+    ["phone", "telefoonnummer", false, 40],
+    ["postcode", "postcode", true, 20],
+    ["houseNumber", "huisnummer", true, 10],
+    ["houseNumberAddition", "huisnummertoevoeging", false, 20],
+    ["street", "straat", true, 150],
+    ["city", "woonplaats", true, 100],
+    ["country", "land", true, 80],
+  ] as const;
+  for (const [key, label, required, max] of billingFields) {
+    const field = key in value ? value[key as keyof typeof value] : undefined;
+    if (typeof field !== "string" || (required && !field.trim()) ||
+        field.trim().length > max || /[\u0000-\u001f\u007f]/.test(field)) {
+      return { valid: false, message: `Controleer het veld ${label} (maximaal ${max} tekens).` };
+    }
   }
-  const fullName = value.fullName.trim();
-  if (fullName.length < 2 || fullName.length > 200 || /[\u0000-\u001f\u007f]/.test(fullName)) {
-    return { valid: false, message: "Vul een volledige naam van 2 tot en met 200 tekens in, zonder besturingstekens." };
+  // The field loop validates unknown input; explicit guards retain narrowed types.
+  if (!("initials" in value) || typeof value.initials !== "string" ||
+      !("firstName" in value) || typeof value.firstName !== "string" ||
+      !("lastName" in value) || typeof value.lastName !== "string" ||
+      !("companyName" in value) || typeof value.companyName !== "string" ||
+      !("phone" in value) || typeof value.phone !== "string" ||
+      !("postcode" in value) || typeof value.postcode !== "string" ||
+      !("houseNumber" in value) || typeof value.houseNumber !== "string" ||
+      !("houseNumberAddition" in value) || typeof value.houseNumberAddition !== "string" ||
+      !("street" in value) || typeof value.street !== "string" ||
+      !("city" in value) || typeof value.city !== "string" ||
+      !("country" in value) || typeof value.country !== "string") {
+    return { valid: false, message: "Controleer uw persoonlijke gegevens en factuuradres." };
+  }
+  const initials = value.initials.trim().replace(/\s+/g, " ");
+  const firstName = value.firstName.trim().replace(/\s+/g, " ");
+  const lastName = value.lastName.trim().replace(/\s+/g, " ");
+  const fullName = [initials, firstName, lastName].filter(Boolean).join(" ");
+  const country = value.country.trim();
+  const dutch = country.toLowerCase() === "nederland";
+  const postcode = dutch ? normalizePostcode(value.postcode) : value.postcode.trim();
+  if (dutch && !/^[1-9][0-9]{3} [A-Z]{2}$/.test(postcode)) {
+    return { valid: false, message: "Vul een Nederlandse postcode in, bijvoorbeeld 1234 AB." };
+  }
+  if (!/^[1-9][0-9]{0,9}$/.test(value.houseNumber.trim())) {
+    return { valid: false, message: "Vul een huisnummer in met alleen cijfers. Gebruik het aparte veld voor een toevoeging." };
+  }
+  if (value.phone.trim() && (!/^\+?[0-9 ()\-.]{5,40}$/.test(value.phone.trim()) ||
+      value.phone.replace(/[^0-9]/g, "").length < 5)) {
+    return { valid: false, message: "Vul een geldig telefoonnummer in of laat dit veld leeg." };
+  }
+  if (!("notes" in value) || typeof value.notes !== "string" || value.notes.length > 2000 ||
+      /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value.notes)) {
+    return { valid: false, message: "Gebruik maximaal 2000 tekens voor uw opmerkingen, zonder besturingstekens." };
   }
 
   if (!("accountNumber" in value) || typeof value.accountNumber !== "string" ||
@@ -122,6 +197,18 @@ export function validateAgreement(value: unknown):
     valid: true,
     data: {
       fullName,
+      initials,
+      firstName,
+      lastName,
+      companyName: value.companyName.trim(),
+      phone: value.phone.trim(),
+      postcode,
+      houseNumber: value.houseNumber.trim(),
+      houseNumberAddition: value.houseNumberAddition.trim(),
+      street: value.street.trim(),
+      city: value.city.trim(),
+      country,
+      notes: value.notes.trim(),
       email: value.email.trim(),
       accountNumber: value.accountNumber.trim(),
       strategy: subscriptionStrategy,

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
-  agreement, formatSubscriptionAmount, positionLabel, subscriptions,
+  agreement, formatAgreementTime, formatSubscriptionAmount, normalizePostcode, positionLabel, subscriptions,
   subscriptionConsent, subscriptionStrategy, subscriptionVersion, validateAgreement,
 } from "@/lib/agreement";
 
@@ -21,7 +21,16 @@ export function AgreementForm() {
   const subscription = subscriptions.find((item) => String(item.positions) === positions);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const [receipt, setReceipt] = useState<{ id: string; acceptedAt: string; notificationWarning?: string } | null>(null);
+  const [receipt, setReceipt] = useState<{ confirmationNumber: string; acceptedAt: string; notificationWarning?: string } | null>(null);
+  const [postcode, setPostcode] = useState("");
+  const [houseNumber, setHouseNumber] = useState("");
+  const [addition, setAddition] = useState("");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("");
+  const [country, setCountry] = useState("Nederland");
+  const [addressMessage, setAddressMessage] = useState("");
+  const [addressPending, setAddressPending] = useState(false);
+  const addressRequest = useRef<AbortController | null>(null);
   const sending = useRef(false);
   const feedback = useRef<HTMLDivElement>(null);
 
@@ -56,14 +65,71 @@ export function AgreementForm() {
     if (receipt || (error && !loading)) feedback.current?.focus();
   }, [receipt, error, loading]);
 
+  function resetAddressLookup() {
+    addressRequest.current?.abort();
+    setAddressMessage("");
+    setAddressPending(false);
+  }
+
+  useEffect(() => () => addressRequest.current?.abort(), []);
+
+  async function lookupAddress() {
+    addressRequest.current?.abort();
+    const controller = new AbortController();
+    addressRequest.current = controller;
+    setAddressPending(true);
+    setAddressMessage("");
+    try {
+      const response = await fetch("/api/postcode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postcode, houseNumber, addition }),
+        signal: controller.signal,
+      });
+      const data: unknown = await response.json();
+      if (controller.signal.aborted) return;
+      if (response.ok && typeof data === "object" && data !== null &&
+          "found" in data && data.found === true &&
+          "street" in data && typeof data.street === "string" &&
+          "city" in data && typeof data.city === "string") {
+        setStreet(data.street);
+        setCity(data.city);
+        setAddressMessage("Adres gevonden. Controleer straat en woonplaats en pas ze zo nodig aan.");
+      } else {
+        setAddressMessage(typeof data === "object" && data !== null &&
+          "message" in data && typeof data.message === "string"
+          ? data.message : "Geen adres gevonden. Vul straat en woonplaats handmatig in.");
+      }
+    } catch {
+      if (!controller.signal.aborted) {
+        setAddressMessage("Adrescontrole is tijdelijk niet beschikbaar. Vul straat en woonplaats handmatig in.");
+      }
+    } finally {
+      if (!controller.signal.aborted) setAddressPending(false);
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (sending.current || !available) return;
+    addressRequest.current?.abort();
+    setAddressPending(false);
     const form = event.currentTarget;
     const fields = new FormData(form);
     const payload = {
-      fullName: fields.get("fullName"),
+      initials: fields.get("initials"),
+      firstName: fields.get("firstName"),
+      lastName: fields.get("lastName"),
+      companyName: fields.get("companyName"),
       email: fields.get("email"),
+      phone: fields.get("phone"),
+      postcode,
+      houseNumber,
+      houseNumberAddition: addition,
+      street,
+      city,
+      country,
+      notes: fields.get("notes"),
       accountNumber: fields.get("accountNumber"),
       strategy: subscriptionStrategy,
       positions: subscription?.positions,
@@ -101,13 +167,14 @@ export function AgreementForm() {
         return;
       }
       if (typeof result !== "object" || result === null ||
-          !("id" in result) || typeof result.id !== "string" ||
+          !("confirmationNumber" in result) || typeof result.confirmationNumber !== "string" ||
+          !/^RUITAB-[0-9]{4}-[0-9]{3,}$/.test(result.confirmationNumber) ||
           !("acceptedAt" in result) || typeof result.acceptedAt !== "string") {
         setError("Er is geen geldige ontvangstbevestiging ontvangen. Neem contact op met MakeMoreMoney voordat u opnieuw verzendt.");
         return;
       }
       setReceipt({
-        id: result.id, acceptedAt: result.acceptedAt,
+        confirmationNumber: result.confirmationNumber, acceptedAt: result.acceptedAt,
         notificationWarning: "notificationWarning" in result && typeof result.notificationWarning === "string"
           ? result.notificationWarning : undefined,
       });
@@ -128,11 +195,9 @@ export function AgreementForm() {
         <h2 className="text-2xl font-bold text-white">Bedankt. Uw abonnement en akkoord zijn ontvangen en geregistreerd.</h2>
         <p className="mt-4 text-slate-300">Aan uw bestaande MEXEM/TradeConnector-koppeling verandert niets.</p>
         {receipt.notificationWarning && <p className="mt-4 text-sm text-amber-200">{receipt.notificationWarning}</p>}
-        <p className="mt-4 break-all text-sm text-slate-400">Registratienummer: {receipt.id}</p>
+        <p className="mt-4 break-all text-sm text-slate-400">Bevestigingsnummer: {receipt.confirmationNumber}</p>
         <p className="mt-2 text-sm text-slate-400">
-          Geregistreerd op: {new Intl.DateTimeFormat("nl-NL", {
-            dateStyle: "long", timeStyle: "long", timeZone: "Europe/Amsterdam",
-          }).format(new Date(receipt.acceptedAt))}
+          Geregistreerd op: {formatAgreementTime(receipt.acceptedAt)}
         </p>
       </div>
     );
@@ -160,20 +225,77 @@ export function AgreementForm() {
           </div>
         )}
         <fieldset disabled={!available || pending} className="space-y-5 disabled:opacity-60">
-          <legend className="sr-only">Alle velden zijn verplicht</legend>
+          <legend className="sr-only">Velden met optioneel in het label zijn niet verplicht</legend>
+          <h3 className="text-lg font-bold text-white">Persoonlijke gegevens</h3>
+          <div className="grid gap-5 sm:grid-cols-3">
+            <div>
+              <label htmlFor="agreement-initials" className="mb-2 block text-sm text-slate-300">Voorletters (optioneel)</label>
+              <input id="agreement-initials" name="initials" maxLength={30} className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="agreement-first-name" className="mb-2 block text-sm text-slate-300">Voornaam</label>
+              <input id="agreement-first-name" name="firstName" autoComplete="given-name" required maxLength={80} className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="agreement-last-name" className="mb-2 block text-sm text-slate-300">Achternaam</label>
+              <input id="agreement-last-name" name="lastName" autoComplete="family-name" required maxLength={80} className={inputClass} />
+            </div>
+          </div>
           <div>
-            <label htmlFor="agreement-name" className="mb-2 block text-sm text-slate-300">Volledige naam</label>
-            <input id="agreement-name" name="fullName" autoComplete="name" required minLength={2} maxLength={200} onBlur={(event) => { event.currentTarget.value = event.currentTarget.value.trim(); }} className={inputClass} placeholder="Uw volledige naam" />
+            <label htmlFor="agreement-company" className="mb-2 block text-sm text-slate-300">Bedrijfsnaam (optioneel)</label>
+            <input id="agreement-company" name="companyName" autoComplete="organization" maxLength={200} className={inputClass} />
           </div>
           <div>
             <label htmlFor="agreement-email" className="mb-2 block text-sm text-slate-300">E-mailadres</label>
             <input id="agreement-email" name="email" type="email" autoComplete="email" required maxLength={254} onBlur={(event) => { event.currentTarget.value = event.currentTarget.value.trim(); }} className={inputClass} placeholder="naam@voorbeeld.nl" />
           </div>
           <div>
+            <label htmlFor="agreement-phone" className="mb-2 block text-sm text-slate-300">Telefoonnummer (optioneel)</label>
+            <input id="agreement-phone" name="phone" type="tel" autoComplete="tel" maxLength={40} className={inputClass} />
+          </div>
+          <h3 className="text-lg font-bold text-white">Factuuradres</h3>
+          <div className="grid gap-5 sm:grid-cols-3">
+            <div>
+              <label htmlFor="agreement-postcode" className="mb-2 block text-sm text-slate-300">Postcode</label>
+              <input id="agreement-postcode" name="postcode" autoComplete="postal-code" required maxLength={20} value={postcode} onChange={(event) => { resetAddressLookup(); setPostcode(event.target.value); }} onBlur={() => { if (country.trim().toLowerCase() === "nederland") setPostcode(normalizePostcode(postcode)); }} className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="agreement-house-number" className="mb-2 block text-sm text-slate-300">Huisnummer</label>
+              <input id="agreement-house-number" name="houseNumber" required inputMode="numeric" pattern="[1-9][0-9]{0,9}" maxLength={10} value={houseNumber} onChange={(event) => { resetAddressLookup(); setHouseNumber(event.target.value); }} className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="agreement-addition" className="mb-2 block text-sm text-slate-300">Huisnummertoevoeging (optioneel)</label>
+              <input id="agreement-addition" name="houseNumberAddition" maxLength={20} value={addition} onChange={(event) => { resetAddressLookup(); setAddition(event.target.value); }} className={inputClass} />
+            </div>
+          </div>
+          {country.trim().toLowerCase() === "nederland" && (
+            <div>
+              <button type="button" disabled={addressPending || !postcode.trim() || !houseNumber.trim()} onClick={() => void lookupAddress()} className={buttonClass}>
+                {addressPending ? "Adres controleren..." : "Adres controleren"}
+              </button>
+              <p className="mt-2 text-sm text-slate-400">Via PDOK, op basis van postcode en huisnummer. U kunt het adres ook handmatig invullen.</p>
+            </div>
+          )}
+          {addressMessage && <p role="status" className="text-sm text-slate-300">{addressMessage}</p>}
+          <div>
+            <label htmlFor="agreement-street" className="mb-2 block text-sm text-slate-300">Straat</label>
+            <input id="agreement-street" name="street" autoComplete="address-line1" required maxLength={150} value={street} onChange={(event) => { addressRequest.current?.abort(); setAddressPending(false); setStreet(event.target.value); }} className={inputClass} />
+          </div>
+          <div>
+            <label htmlFor="agreement-city" className="mb-2 block text-sm text-slate-300">Woonplaats</label>
+            <input id="agreement-city" name="city" autoComplete="address-level2" required maxLength={100} value={city} onChange={(event) => { addressRequest.current?.abort(); setAddressPending(false); setCity(event.target.value); }} className={inputClass} />
+          </div>
+          <div>
+            <label htmlFor="agreement-country" className="mb-2 block text-sm text-slate-300">Land</label>
+            <input id="agreement-country" name="country" autoComplete="country-name" required maxLength={80} value={country} onChange={(event) => { resetAddressLookup(); setCountry(event.target.value); }} className={inputClass} />
+          </div>
+          <h3 className="text-lg font-bold text-white">Beleggingsrekening</h3>
+          <div>
             <label htmlFor="agreement-account" className="mb-2 block text-sm text-slate-300">MEXEM-rekeningnummer</label>
             <input id="agreement-account" name="accountNumber" autoComplete="off" autoCapitalize="characters" spellCheck={false} required minLength={3} maxLength={32} pattern="U[0-9]{2,31}" onBlur={(event) => { event.currentTarget.value = event.currentTarget.value.trim(); }} aria-describedby="account-help" className={inputClass} placeholder="Bijvoorbeeld U1234567" />
             <p id="account-help" className="mt-2 text-sm text-slate-400">Uw MEXEM-rekeningnummer begint doorgaans met een U.</p>
           </div>
+          <h3 className="text-lg font-bold text-white">Abonnement</h3>
           <div>
             <p id="strategy-label" className="mb-2 text-sm text-slate-300">Strategie</p>
             <p aria-labelledby="strategy-label" className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 font-semibold text-emerald-300">{subscriptionStrategy}</p>
@@ -204,9 +326,13 @@ export function AgreementForm() {
                   </div>
                 ))}
               </dl>
-              <p className="mt-4 text-sm text-slate-400">Het abonnement wordt per drie maanden vooruitbetaald.</p>
             </section>
           )}
+          <div>
+            <h3 className="mb-4 text-lg font-bold text-white">Aanvullende informatie</h3>
+            <label htmlFor="agreement-notes" className="mb-2 block text-sm text-slate-300">Opmerkingen (optioneel)</label>
+            <textarea id="agreement-notes" name="notes" rows={3} maxLength={2000} className={inputClass} placeholder="Heeft u nog vragen of opmerkingen over uw abonnement? Laat het ons hier weten." />
+          </div>
           <label className="flex items-start gap-3 text-sm leading-6 text-slate-300">
             <input name="accepted" type="checkbox" required checked={accepted} onChange={(event) => setAccepted(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300" />
             <span>{agreement.consentText}</span>
