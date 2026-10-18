@@ -61,8 +61,13 @@ async function notifyOwner(env: Environment, data: AgreementInput, id: string, a
     }
     console.error("agreement_email_send_failed");
     return "failed";
-  } catch {
-    console.error("agreement_email_request_failed");
+  } catch (error) {
+    const code = error instanceof Error && "code" in error &&
+      typeof error.code === "string" && /^[A-Z_0-9]{1,40}$/.test(error.code)
+      ? error.code : "UNKNOWN";
+    const responseCode = error instanceof Error && "responseCode" in error &&
+      typeof error.responseCode === "number" ? error.responseCode : undefined;
+    console.error("agreement_email_request_failed", { code, responseCode });
     return "failed";
   } finally {
     transport.close();
