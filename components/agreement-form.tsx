@@ -133,7 +133,6 @@ export function AgreementForm() {
       city,
       country,
       notes: fields.get("notes"),
-      accountNumber: fields.get("accountNumber"),
       strategy: subscriptionStrategy,
       positions: subscription?.positions,
       capital: subscription?.capital,
@@ -290,12 +289,6 @@ export function AgreementForm() {
           <div>
             <label htmlFor="agreement-country" className="mb-2 block text-sm text-slate-300">Land</label>
             <input id="agreement-country" name="country" autoComplete="country-name" required maxLength={80} value={country} onChange={(event) => { resetAddressLookup(); setCountry(event.target.value); }} className={inputClass} />
-          </div>
-          <h3 className="text-lg font-bold text-white">Beleggingsrekening</h3>
-          <div>
-            <label htmlFor="agreement-account" className="mb-2 block text-sm text-slate-300">MEXEM-rekeningnummer</label>
-            <input id="agreement-account" name="accountNumber" autoComplete="off" autoCapitalize="characters" spellCheck={false} required minLength={3} maxLength={32} pattern="U[0-9]{2,31}" onBlur={(event) => { event.currentTarget.value = event.currentTarget.value.trim(); }} aria-describedby="account-help" className={inputClass} placeholder="Bijvoorbeeld U1234567" />
-            <p id="account-help" className="mt-2 text-sm text-slate-400">Uw MEXEM-rekeningnummer begint doorgaans met een U.</p>
           </div>
           <h3 className="text-lg font-bold text-white">Abonnement</h3>
           <div>

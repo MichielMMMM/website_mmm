@@ -10,6 +10,7 @@ import ts from "typescript";
 import nodemailer from "nodemailer";
 import net from "node:net";
 import { EventEmitter } from "node:events";
+import { DatabaseSync } from "node:sqlite";
 
 const root = process.cwd();
 const wrangler = path.join(root, "node_modules", "wrangler", "bin", "wrangler.js");
@@ -44,7 +45,6 @@ const validInput = {
   city: "'s-Gravenhage",
   country: "Nederland",
   notes: "Testopmerking\nTweede regel",
-  accountNumber: "U1234567",
   strategy: subscriptionStrategy,
   ...subscriptions[4],
   accepted: true,
@@ -57,7 +57,7 @@ const validInput = {
 test("validation requires explicit consent, current document and valid fields", () => {
   assert.equal(agreement.version, "1.0");
   assert.equal(agreement.date, "01-09-2026");
-  assert.equal(agreement.consentText, "Ik heb de Copy Trading Raamovereenkomst MakeMoreMoney, versie 1.0 van 01-09-2026, gelezen en ga hiermee akkoord.");
+  assert.equal(agreement.consentText, "Ik heb de Copy Trading Raamovereenkomst MakeMoreMoney gelezen en ga hiermee akkoord.");
   assert.equal(validateAgreement(validInput).valid, true);
   for (const accepted of [false, undefined, "true", "on", 1, null]) {
     assert.equal(validateAgreement({ ...validInput, accepted }).valid, false);
@@ -65,24 +65,23 @@ test("validation requires explicit consent, current document and valid fields", 
   }
   for (const fields of [
     { firstName: "  " }, { lastName: "" }, { firstName: "a".repeat(81) },
-    { firstName: "Test\nKlant" }, { accountNumber: "" },
+    { firstName: "Test\nKlant" },
     { postcode: "0000AB" }, { houseNumber: "12A" }, { street: "" }, { city: "" }, { country: "" },
     { initials: "\nA" }, { companyName: "x".repeat(201) }, { phone: "abc" },
     { notes: "x".repeat(2001) }, { notes: "\u0000" },
-    { accountNumber: "<script>" }, { accountNumber: "a".repeat(33) },
-    { accountNumber: "u1234567" }, { accountNumber: "U123x" }, { accountNumber: "U12 34" },
     { email: "" }, { email: "invalid" }, { email: "a@b" }, { email: "a\n@example.test" },
     { positions: 0 }, { positions: 21 }, { positions: 1.5 }, { positions: "5" },
     { capital: 1 }, { monthly: 1 }, { quarterly: 1 },
     { subscriptionConsentText: "edited" }, { subscriptionVersion: "old" },
     { strategy: "unknown" }, { agreementId: "old-version" },
     { agreementId: "copy-trading-v1-2026-10-18" },
+    { agreementId: "copy-trading-v1.0-2026-09-01" },
   ]) {
     assert.equal(validateAgreement({ ...validInput, ...fields }).valid, false);
   }
   assert.equal(validateAgreement(null).valid, false);
-  const trimmed = validateAgreement({ ...validInput, initials: " J. ", firstName: " Jan ", lastName: " van  Dijk ", fullName: "untrusted", postcode: "2511bt", accountNumber: " U123 ", email: " test@example.test " });
-  assert.equal(trimmed.data.accountNumber, "U123");
+  const trimmed = validateAgreement({ ...validInput, initials: " J. ", firstName: " Jan ", lastName: " van  Dijk ", fullName: "untrusted", postcode: "2511bt", email: " test@example.test " });
+  assert.equal(trimmed.data.accountNumber, undefined);
   assert.equal(trimmed.data.email, "test@example.test");
   assert.equal(trimmed.data.fullName, "J. Jan van Dijk");
   assert.equal(trimmed.data.postcode, "2511 BT");
@@ -110,6 +109,38 @@ test("exact customer pricing, Dutch amounts and singular consent", () => {
   assert.equal(subscriptionConsent(subscriptions[2]), "Ik bevestig mijn keuze voor Premie Collector Plus – volgsysteem met 3 posities tegen € 50 per maand (€ 150 per drie maanden). Het abonnement wordt voor drie maanden aangegaan en vooraf betaald, wordt daarna telkens automatisch met drie maanden verlengd en kan worden opgezegd tot uiterlijk één maand vóór de eerstvolgende verlengingsdatum.");
   assert.match(subscriptionConsent(subscriptions[0]), /met 1 positie tegen € 25 per maand \(€ 75 per drie maanden\)/);
   assert.match(subscriptionConsent(subscriptions[19]), /met 20 posities tegen € 305 per maand \(€ 915 per drie maanden\)/);
+});
+
+test("account migration preserves historical evidence and confirmation sequence", async () => {
+  const db = new DatabaseSync(":memory:");
+  try {
+    for (const name of ["0001_agreement_acceptances.sql", "0002_subscription_acceptance.sql",
+      "0003_agreement_notifications.sql", "0004_customer_billing.sql"]) {
+      db.exec(await readFile(path.join(root, "migrations", name), "utf8"));
+    }
+    db.exec(`INSERT INTO agreement_acceptances (
+      id, full_name, mexem_account_number, strategy, strategy_label,
+      document_name, document_version, document_date, consent_text, accepted, accepted_at,
+      confirmation_year
+    ) VALUES ('historical', 'Historical customer', 'U1234567', 'strategy', 'strategy',
+      'document', '1.0', '01-09-2026', 'Historical exact consent', 1, '2026-10-18T12:00:00Z', 2026)`);
+    const before = { ...db.prepare("SELECT * FROM agreement_acceptances").get() };
+    db.exec("BEGIN");
+    db.exec(await readFile(path.join(root, "migrations", "0005_optional_legacy_account.sql"), "utf8"));
+    db.exec("COMMIT");
+    assert.deepEqual({ ...db.prepare("SELECT * FROM agreement_acceptances").get() }, before);
+    db.exec(`INSERT INTO agreement_acceptances (
+      id, full_name, strategy, strategy_label, document_name, document_version,
+      document_date, consent_text, accepted, accepted_at, confirmation_year
+    ) SELECT 'new', full_name, strategy, strategy_label, document_name, document_version,
+      document_date, consent_text, accepted, accepted_at, confirmation_year
+      FROM agreement_acceptances WHERE id = 'historical'`);
+    const current = db.prepare("SELECT mexem_account_number, confirmation_number FROM agreement_acceptances WHERE id = 'new'").get();
+    assert.equal(current.mexem_account_number, null);
+    assert.equal(current.confirmation_number, "RUITAB-2026-002");
+  } finally {
+    db.close();
+  }
 });
 
 test("independent PDOK lookup matches postcode, number and addition and permits manual fallback", async (context) => {
@@ -177,6 +208,7 @@ test("built HTML has exact robots directive and no discoverable links or sitemap
   assert.doesNotMatch(html, /Het document opent in een nieuw tabblad/);
   assert.match(html, /U hoeft deze koppeling niet opnieuw uit te voeren/);
   assert.ok(html.includes(agreement.consentText));
+  assert.doesNotMatch(html, /Beleggingsrekening|MEXEM-rekeningnummer|name="accountNumber"/);
   assert.doesNotMatch(html, /<p[^>]*>Versie /);
   assert.ok(!html.includes(subscriptionTerms));
   assert.doesNotMatch(html, /Wij bewaren uw naam/);
@@ -427,7 +459,6 @@ test("Cloudflare Function stores real D1 records and rejects invalid or unavaila
     assert.equal((await post({ ...validInput, strategy: "unknown" })).status, 400);
     assert.equal((await post({ ...validInput, agreementId: "old" })).status, 400);
     assert.equal((await post({ ...validInput, firstName: " " })).status, 400);
-    assert.equal((await post({ ...validInput, accountNumber: "<script>" })).status, 400);
     assert.equal((await post("{")).status, 400);
     assert.equal((await post("x".repeat(17000))).status, 413);
     assert.equal((await post(validInput, { Origin: "https://example.org" })).status, 403);
@@ -452,7 +483,7 @@ test("Cloudflare Function stores real D1 records and rejects invalid or unavaila
     assert.deepEqual({ ...records[0], notification_updated_at: undefined }, {
       id: records[0].id,
       full_name: validInput.fullName,
-      mexem_account_number: validInput.accountNumber,
+      mexem_account_number: null,
       strategy: validInput.strategy,
       strategy_label: subscriptionStrategy,
       document_name: agreement.name,

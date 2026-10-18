@@ -105,6 +105,11 @@ Het formulier verifieert niet de identiteit of het bestaande klant-/rekeningbezi
    `npx wrangler d1 execute mmm-agreements --remote --file migrations/0004_customer_billing.sql`
    eenmaal uit **voor** deployment. Oude rijen krijgen geen verzonnen namen, adressen
    of bevestigingsnummers: de nieuwe kolommen blijven daar NULL.
+   Voer daarna `migrations/0005_optional_legacy_account.sql` eenmaal uit, atomair
+   via D1, voor deployment van het formulier zonder rekeningnummer.
+   Deze migratie kopieert alle bestaande gegevens naar dezelfde tabelstructuur
+   met een nullable historisch rekeningnummer en herstelt de index en nummertrigger.
+   De jaarteller blijft behouden. Nieuwe registraties verzamelen geen rekeningnummer.
 4. Koppel bij **Workers & Pages > website-mmm > Settings > Bindings** een
    D1-database met bindingsnaam **AGREEMENTS_DB**. Koppel preview aan een aparte
    testdatabase als previews moeten kunnen registreren; gebruik daar niet de
@@ -117,7 +122,7 @@ Het formulier verifieert niet de identiteit of het bestaande klant-/rekeningbezi
    Controleer na deployment de pagina en een geautoriseerde testinzending in D1.
 
 Inzendingen worden in D1-tabel `agreement_acceptances` opgeslagen. Elke rij bevat
-een UUID, naam, e-mailadres, MEXEM-rekeningnummer, vaste strategie
+een UUID, naam, e-mailadres, vaste strategie
 "Premie Collector Plus – volgsysteem", aantal posities, indicatief kapitaal,
 maand- en driemaandstarief, documentnaam, versie, datum, beide exacte checkboxteksten,
 twee expliciete akkoorden, abonnementsversie en het servertijdstip
@@ -153,8 +158,9 @@ bij geen resultaat, time-out of storing blijft handmatige invoer mogelijk.
 Er worden geen persoonsgegevens gelogd; alleen het adresdeel wordt aan PDOK verzonden,
 geen naam, e-mailadres of rekeningnummer. Neem dit op in het privacybeleid.
 Deze implementatie staat volledig op zichzelf: geen code, configuratie of sleutels
-uit Facturatie en geen afhankelijkheid van dat project. Het U-nummer wordt uitsluitend
-lokaal op formaat gecontroleerd; er bestaat geen IBKR- of MEXEM-lookup.
+uit Facturatie en geen afhankelijkheid van dat project. Het formulier vraagt geen
+MEXEM-rekeningnummer meer. Historische rekeningnummers blijven bewaard;
+er bestaat geen IBKR- of MEXEM-lookup.
 
 ### Bevestigingsmail aan de klant
 

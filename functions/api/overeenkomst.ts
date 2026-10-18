@@ -239,18 +239,17 @@ export async function onRequest({ request, env }: { request: Request; env: Envir
   try {
     const result = await database.prepare(`
       INSERT INTO agreement_acceptances (
-        id, full_name, mexem_account_number, strategy, strategy_label,
+        id, full_name, strategy, strategy_label,
         document_name, document_version, document_date, consent_text, accepted, accepted_at,
         email, positions, indicative_capital, monthly_rate, quarterly_rate,
         subscription_consent_text, subscription_accepted, subscription_version, notification_status,
         initials, first_name, last_name, company_name, phone, postcode,
         house_number, house_number_addition, street, city, country, confirmation_year, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending',
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending',
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
       validation.data.fullName,
-      validation.data.accountNumber,
       validation.data.strategy,
       validation.data.strategy,
       agreement.name,

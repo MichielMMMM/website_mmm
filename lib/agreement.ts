@@ -1,11 +1,11 @@
 export const agreement = {
-  id: "copy-trading-v1.0-2026-09-01",
+  id: "copy-trading-v1.0-2026-09-01-consent-v2",
   name: "Copy Trading Raamovereenkomst MakeMoreMoney",
   version: "1.0",
   date: "01-09-2026",
   documentPath: "/documenten/copy-trading-raamovereenkomst-makemoremoney-v1.0.pdf",
   consentText:
-    "Ik heb de Copy Trading Raamovereenkomst MakeMoreMoney, versie 1.0 van 01-09-2026, gelezen en ga hiermee akkoord.",
+    "Ik heb de Copy Trading Raamovereenkomst MakeMoreMoney gelezen en ga hiermee akkoord.",
 } as const;
 
 export const subscriptionStrategy = "Premie Collector Plus – volgsysteem";
@@ -78,7 +78,6 @@ export type AgreementInput = {
   city: string;
   country: string;
   notes: string;
-  accountNumber: string;
   strategy: string;
   positions: number;
   capital: number;
@@ -166,11 +165,6 @@ export function validateAgreement(value: unknown):
     return { valid: false, message: "Gebruik maximaal 2000 tekens voor uw opmerkingen, zonder besturingstekens." };
   }
 
-  if (!("accountNumber" in value) || typeof value.accountNumber !== "string" ||
-      !/^U[0-9]{2,31}$/.test(value.accountNumber.trim())) {
-    return { valid: false, message: "Vul een MEXEM-rekeningnummer in dat begint met een hoofdletter U, gevolgd door alleen cijfers (3 tot en met 32 tekens)." };
-  }
-
   if (!("email" in value) || typeof value.email !== "string" ||
       value.email.trim().length > 254 ||
       !/^[^\s@<>\u0000-\u001f\u007f]+@[^\s@<>\u0000-\u001f\u007f]+\.[^\s@<>\u0000-\u001f\u007f]+$/.test(value.email.trim())) {
@@ -210,7 +204,6 @@ export function validateAgreement(value: unknown):
       country,
       notes: value.notes.trim(),
       email: value.email.trim(),
-      accountNumber: value.accountNumber.trim(),
       strategy: subscriptionStrategy,
       ...subscription,
       accepted: true,
