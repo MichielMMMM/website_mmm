@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import { SiteFooter, SiteHeader } from "@/components/site-shell";
 import { agreement } from "@/lib/agreement";
 
 export const metadata: Metadata = {
   title: "Algemene Voorwaarden | MakeMoreMoney",
-  description: "Algemene voorwaarden van MakeMoreMoney voor de website, abonnementen en dienstverlening. Versie 1.0 van 18-10-2026.",
+  description: "Algemene voorwaarden van MakeMoreMoney voor de website, abonnementen en dienstverlening. Versie 1.0 van 1-9-2026.",
   robots: { index: true, follow: true },
 };
 
@@ -137,12 +136,17 @@ const articles = [
 export default function AlgemeneVoorwaardenPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <SiteHeader />
-      <main className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+      <header className="border-b border-slate-800/80 bg-slate-950/80">
+        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-5 sm:px-6 lg:px-8">
+          <div aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/30">M</div>
+          <span className="text-lg font-bold tracking-tight text-white">MakeMoreMoney</span>
+        </div>
+      </header>
+      <main className="mx-auto max-w-3xl break-words px-4 py-12 sm:px-6 sm:py-20 lg:px-8">
         <header className="mb-10">
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.26em] text-emerald-300">MakeMoreMoney</p>
           <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl">Algemene Voorwaarden</h1>
-          <p className="mt-4 text-sm text-slate-400">Versie 1.0 | 18-10-2026</p>
+          <p className="mt-4 text-sm text-slate-400">Versie 1.0 | 1-9-2026</p>
         </header>
 
         <div className="max-w-3xl space-y-12">
@@ -167,7 +171,6 @@ export default function AlgemeneVoorwaardenPage() {
           ))}
         </div>
       </main>
-      <SiteFooter />
     </div>
   );
 }
