@@ -8,6 +8,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import { test } from "node:test";
 import ts from "typescript";
 import nodemailer from "nodemailer";
+import net from "node:net";
+import { EventEmitter } from "node:events";
 
 const root = process.cwd();
 const wrangler = path.join(root, "node_modules", "wrangler", "bin", "wrangler.js");
@@ -135,13 +137,28 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
     let stored = false;
     let status;
     context.mock.method(nodemailer, "createTransport", (options) => {
-      assert.equal(options.host, "mail.hostnet.nl");
+      assert.equal(options.host, "smtp.hostnet.nl");
       assert.equal(options.port, 587);
       assert.equal(options.requireTLS, true);
       assert.equal(options.tls.rejectUnauthorized, true);
       assert.equal(options.tls.servername, "smtp.hostnet.nl");
       assert.equal(options.auth.user, "michiel2@mijs.nl");
       assert.equal(options.auth.pass, "test-password");
+      const socket = new EventEmitter();
+      socket.setTimeout = () => socket;
+      socket.destroy = () => {};
+      context.mock.method(net, "createConnection", (connectionOptions) => {
+        assert.deepEqual(connectionOptions, { host: "smtp.hostnet.nl", port: 587 });
+        return socket;
+      });
+      let connectedSocket;
+      options.getSocket({}, (error, result) => {
+        assert.equal(error, null);
+        connectedSocket = result.connection;
+      });
+      socket.emit("connect");
+      assert.equal(connectedSocket, socket);
+      assert.equal(socket.listenerCount("timeout"), 0);
       return { close() {}, async sendMail(message) {
       events.push("email");
       assert.equal(stored, true);

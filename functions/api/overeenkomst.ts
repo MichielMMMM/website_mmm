@@ -1,5 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import nodemailer from "nodemailer";
+import net from "node:net";
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import { agreement, formatSubscriptionAmount, validateAgreement } from "../../lib/agreement";
 import type { AgreementInput } from "../../lib/agreement";
 
@@ -18,8 +20,7 @@ async function notifyOwner(env: Environment, data: AgreementInput, id: string, a
     return "not_configured";
   }
   const transport = nodemailer.createTransport({
-    // Use the canonical DNS target: Workers can return the SMTP alias as an IP.
-    host: "mail.hostnet.nl",
+    host: "smtp.hostnet.nl",
     port: 587,
     secure: false,
     requireTLS: true,
@@ -32,6 +33,26 @@ async function notifyOwner(env: Environment, data: AgreementInput, id: string, a
     debug: false,
     disableFileAccess: true,
     disableUrlAccess: true,
+    // Preserve the hostname on Workers' socket for STARTTLS certificate checks.
+    getSocket(_options: SMTPTransport.Options, callback: (error: Error | null, options?: { connection: net.Socket }) => void) {
+      const socket = net.createConnection({ host: "smtp.hostnet.nl", port: 587 });
+      const fail = (error: Error) => {
+        socket.removeListener("connect", connected);
+        socket.destroy();
+        callback(error);
+      };
+      const timedOut = () => fail(new Error("SMTP connection timeout"));
+      const connected = () => {
+        socket.removeListener("error", fail);
+        socket.removeListener("timeout", timedOut);
+        socket.setTimeout(0);
+        callback(null, { connection: socket });
+      };
+      socket.once("error", fail);
+      socket.once("timeout", timedOut);
+      socket.once("connect", connected);
+      socket.setTimeout(10000);
+    },
   });
   try {
     const result = await transport.sendMail({
