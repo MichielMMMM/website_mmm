@@ -217,13 +217,14 @@ test("built HTML has exact robots directive and no discoverable links or sitemap
   assert.match(html, /U hoeft deze koppeling niet opnieuw uit te voeren/);
   assert.ok(html.replace(/<[^>]*>/g, "").includes(agreement.consentText));
   assert.doesNotMatch(html, /Copy Trading Raamovereenkomst bekijken/);
+  assert.doesNotMatch(html, /Door op ‘Abonnement en overeenkomst bevestigen’ te klikken/);
   for (const documentPath of [agreement.documentPath, generalTerms.path]) {
     const link = [...html.matchAll(/<a\b[^>]*>/g)].map((match) => match[0])
       .find((tag) => tag.includes(`href="${documentPath}"`));
     assert.ok(link);
     assert.match(link, /target="_blank"/);
     assert.match(link, /font-bold/);
-    assert.match(link, /\bunderline\b/);
+    assert.match(link, /\bunderline!/);
   }
   assert.match(html, /<input(?=[^>]*name="generalTermsAccepted")(?=[^>]*required)[^>]*>/);
   assert.match(html, /href="\/algemene-voorwaarden"[^>]*target="_blank"/);

@@ -323,7 +323,7 @@ export function AgreementForm() {
           </div>
           <label className="flex items-start gap-3 text-sm leading-6 text-slate-300">
             <input name="accepted" type="checkbox" required checked={accepted} onChange={(event) => setAccepted(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300" />
-            <span>Ik heb de <a href={agreement.documentPath} target="_blank" rel="noopener noreferrer" className="font-bold text-emerald-300 underline underline-offset-4 hover:text-emerald-200">{agreement.name}</a> gelezen en ga hiermee akkoord.</span>
+            <span>Ik heb de <a href={agreement.documentPath} target="_blank" rel="noopener noreferrer" className="font-bold text-emerald-300 underline! underline-offset-4 hover:text-emerald-200">{agreement.name}</a> gelezen en ga hiermee akkoord.</span>
           </label>
           <label className="flex items-start gap-3 text-sm leading-6 text-slate-300">
             <input name="subscriptionAccepted" type="checkbox" required disabled={!subscription} checked={subscriptionAccepted} onChange={(event) => setSubscriptionAccepted(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300" />
@@ -331,11 +331,8 @@ export function AgreementForm() {
           </label>
           <label className="flex items-start gap-3 text-sm leading-6 text-slate-300">
             <input name="generalTermsAccepted" type="checkbox" required checked={generalTermsAccepted} onChange={(event) => setGeneralTermsAccepted(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300" />
-            <span>Ik heb de <a href={generalTerms.path} target="_blank" rel="noopener noreferrer" className="font-bold text-emerald-300 underline underline-offset-4 hover:text-emerald-200">Algemene Voorwaarden MakeMoreMoney</a> gelezen en ga hiermee akkoord.</span>
+            <span>Ik heb de <a href={generalTerms.path} target="_blank" rel="noopener noreferrer" className="font-bold text-emerald-300 underline! underline-offset-4 hover:text-emerald-200">Algemene Voorwaarden MakeMoreMoney</a> gelezen en ga hiermee akkoord.</span>
           </label>
-          <p className="text-sm leading-6 text-slate-400">
-            Door op ‘Abonnement en overeenkomst bevestigen’ te klikken, bevestigt u uw gegevens, uw abonnementskeuze en uw akkoord met de Copy Trading Raamovereenkomst MakeMoreMoney en de Algemene Voorwaarden MakeMoreMoney.
-          </p>
           <button type="submit" disabled={!accepted || !generalTermsAccepted || !subscriptionAccepted || !subscription || !available || pending} className={`${buttonClass} w-full sm:w-auto`}>
             {pending ? "Akkoord registreren..." : "Abonnement en overeenkomst bevestigen"}
           </button>
