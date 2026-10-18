@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   agreement, formatSubscriptionAmount, positionLabel, subscriptions,
-  subscriptionConsent, subscriptionStrategy, subscriptionTerms, subscriptionVersion, validateAgreement,
+  subscriptionConsent, subscriptionStrategy, subscriptionVersion, validateAgreement,
 } from "@/lib/agreement";
 
 const inputClass =
@@ -207,9 +207,6 @@ export function AgreementForm() {
               <p className="mt-4 text-sm text-slate-400">Het abonnement wordt per drie maanden vooruitbetaald.</p>
             </section>
           )}
-          <div className="space-y-3 text-sm leading-6 text-slate-300">
-            <p>{subscriptionTerms}</p>
-          </div>
           <label className="flex items-start gap-3 text-sm leading-6 text-slate-300">
             <input name="accepted" type="checkbox" required checked={accepted} onChange={(event) => setAccepted(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300" />
             <span>{agreement.consentText}</span>

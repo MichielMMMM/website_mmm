@@ -94,7 +94,7 @@ test("built HTML has exact robots directive and no discoverable links or sitemap
   assert.doesNotMatch(html, /Het document opent in een nieuw tabblad/);
   assert.match(html, /U hoeft deze koppeling niet opnieuw uit te voeren/);
   assert.ok(html.includes(agreement.consentText));
-  assert.ok(html.includes(subscriptionTerms));
+  assert.ok(!html.includes(subscriptionTerms));
   assert.doesNotMatch(html, /Wij bewaren uw naam/);
   for (const route of ["index", "contact", "abonnement", "dashboard", "resultaten", "tarieven", "werkwijze", "werk-in-voortgang"]) {
     const otherHtml = await readFile(path.join(root, "out", `${route}.html`), "utf8");
