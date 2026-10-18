@@ -128,7 +128,7 @@ const articles = [
     title: "Artikel 15. Contactgegevens",
     paragraphs: [
       "MakeMoreMoney\nStatensingel 36a\n3039 LN Rotterdam\nNederland",
-      "KvK-nummer: 89985273\nBTW-nummer: NL004778508B03\nIBAN: NL45RABO0386009872",
+      "KvK-nummer: 89985273",
     ],
   },
 ];
