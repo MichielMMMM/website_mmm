@@ -57,7 +57,7 @@ async function notifyOwner(env: Environment, data: AgreementInput, id: string, a
   try {
     const result = await transport.sendMail({
           to: notificationRecipient,
-          from: notificationSender,
+          from: { name: "Make More Money", address: notificationSender },
           subject: `MakeMoreMoney: abonnement en overeenkomst bevestigd (${id})`,
           text: [
             "Een klant heeft het abonnement en de overeenkomst bevestigd.",

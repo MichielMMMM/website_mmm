@@ -163,7 +163,7 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       events.push("email");
       assert.equal(stored, true);
       assert.equal(message.to, "michiel@mijs.nl");
-      assert.equal(message.from, "michiel2@mijs.nl");
+      assert.deepEqual(message.from, { name: "Make More Money", address: "michiel2@mijs.nl" });
       assert.ok(message.text.includes(validInput.subscriptionConsentText));
       assert.ok(message.text.includes(agreement.consentText));
       assert.ok(message.text.includes("€ 240"));

@@ -130,7 +130,8 @@ bedragen en beide exacte akkoordverklaringen. Er gaat geen mail naar de klant.
 De mail bevat persoonsgegevens: beveilig ook de ontvangende mailbox en neem
 deze verwerking mee in uw privacy- en bewaarbeleid.
 
-Afzender en SMTP-login zijn **michiel2@mijs.nl**; ontvanger is **michiel@mijs.nl**. De Function gebruikt
+De zichtbare afzender is **Make More Money <michiel2@mijs.nl>**; de SMTP-login blijft
+**michiel2@mijs.nl** en de ontvanger is **michiel@mijs.nl**. De Function gebruikt
 `smtp.hostnet.nl:587`, verplichte STARTTLS en certificaatcontrole voor `smtp.hostnet.nl`.
 De verbinding wordt via Nodemailers `getSocket` met de hostnaam geopend. Zo blijft
 de hostnaam beschikbaar voor certificaatcontrole in de Cloudflare-runtime, zonder
