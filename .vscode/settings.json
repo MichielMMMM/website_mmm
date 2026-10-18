@@ -1,5 +1,9 @@
 {
     "chat.tools.terminal.autoApprove": {
-        "Test-Path": true
+        "Test-Path": true,
+        "/^node --version; Get-ChildItem \\.github -ErrorAction SilentlyContinue; git --no-pager ls-files$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
 }

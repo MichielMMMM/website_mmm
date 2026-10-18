@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Klantformulier voorbereiden",
+			"type": "shell",
+			"command": "npm run build; if ($LASTEXITCODE -eq 0) { npm run db:migrate:local }",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Klantformulier lokaal testen",
+			"type": "shell",
+			"command": "npm run dev:cloudflare -- --port 8794 --ip 127.0.0.1",
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}
