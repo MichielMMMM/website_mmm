@@ -94,7 +94,7 @@ async function notifyCustomer(env: Environment, data: StoredAgreement) {
   try {
     const greeting = data.salutation === "heer" ? `Geachte heer ${data.last_name},`
       : data.salutation === "mevrouw" ? `Geachte mevrouw ${data.last_name},`
-      : `Geachte ${data.first_name} ${data.last_name},`;
+      : `Geachte heer/mevrouw ${data.last_name},`;
     const documents = [
       { label: `De ${data.document_name}`, url: `https://makemoremoney.nl${agreement.documentPath}` },
       { label: "De algemene voorwaarden van MakeMoreMoney", url: `https://makemoremoney.nl${generalTerms.path}` },

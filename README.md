@@ -142,8 +142,9 @@ datum en exacte akkoordtekst worden bij dezelfde registratie met hetzelfde
 UTC-tijdstip opgeslagen. De bevestigingsmail toont twee klikbare documentverwijzingen
 zonder losse documentversies of documentdatums; deze blijven wel als bewijs opgeslagen.
 De optionele aanhefkeuze wordt opgeslagen als `heer`, `mevrouw` of `neutraal`.
-De mail gebruikt de opgeslagen achternaam bij heer/mevrouw en voor- en achternaam
-bij neutraal. Zowel HTML (met ontsnapte klantgegevens) als platte tekst wordt verstuurd.
+De mail gebruikt de opgeslagen achternaam met "Geachte heer", "Geachte mevrouw"
+of bij neutraal "Geachte heer/mevrouw". Zowel HTML (met ontsnapte klantgegevens)
+als platte tekst wordt verstuurd.
 
 Nieuwe registraties bewaren voorletters, voornaam en achternaam afzonderlijk, met een
 samengestelde volledige naam (zonder dubbele spaties), optionele bedrijfsnaam en

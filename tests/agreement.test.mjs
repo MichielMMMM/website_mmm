@@ -359,7 +359,7 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       assert.equal(message.subject, "Bevestiging MakeMoreMoney-abonnement en overeenkomst");
       for (const text of [
         snapshot.salutation === "heer" ? "Geachte heer van Dijk,"
-          : snapshot.salutation === "mevrouw" ? "Geachte mevrouw van Dijk," : "Geachte Opgeslagen van Dijk,",
+          : snapshot.salutation === "mevrouw" ? "Geachte mevrouw van Dijk," : "Geachte heer/mevrouw van Dijk,",
         snapshot.strategy_label, snapshot.confirmation_number,
         snapshot.full_name, snapshot.company_name, "Spui 68A", "2511 BT 's-Gravenhage", snapshot.country,
         snapshot.document_name, snapshot.notes,
@@ -369,6 +369,7 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
         "Aantal posities: 3", "€ 25.500", "€ 51 per maand", "€ 153 per drie maanden",
         "18-10-2026 om 13:00", subscriptionTerms, "Met vriendelijke groet,",
       ]) assert.ok(message.text.includes(text), `Missing stored mail content: ${text}`);
+      assert.ok(message.html.startsWith(`<p>${message.text.split("\n")[0]}</p>`));
       assert.ok(!message.text.includes(validInput.subscriptionConsentText));
       assert.ok(!message.text.includes(agreement.consentText));
       assert.ok(!message.text.includes(snapshot.id));
