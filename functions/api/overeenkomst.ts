@@ -134,7 +134,7 @@ async function notifyCustomer(env: Environment, data: StoredAgreement) {
     const result = await transport.sendMail({
           to: data.email,
           bcc: notificationRecipient,
-          from: { name: "Make More Money", address: notificationSender },
+          from: { name: "MakeMoreMoney", address: notificationSender },
           subject: "Bevestiging MakeMoreMoney-abonnement en overeenkomst",
           text: paragraphs.join("\n\n"),
           html: paragraphs.map((paragraph) => paragraph === documentList

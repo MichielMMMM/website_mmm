@@ -405,7 +405,7 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       assert.equal(stored, true);
       assert.equal(message.to, snapshot.email);
       assert.equal(message.bcc, "info@makemoremoney.nl");
-      assert.deepEqual(message.from, { name: "Make More Money", address: "info@makemoremoney.nl" });
+      assert.deepEqual(message.from, { name: "MakeMoreMoney", address: "info@makemoremoney.nl" });
       assert.equal(message.subject, "Bevestiging MakeMoreMoney-abonnement en overeenkomst");
       for (const text of [
         snapshot.salutation === "heer" ? "Geachte heer van Dijk,"
