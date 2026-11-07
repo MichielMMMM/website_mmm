@@ -1,19 +1,19 @@
 export const agreement = {
-  id: "copy-trading-v1.0-2026-09-01-consent-v2",
+  id: "copy-trading-v1.1-2026-11-07-consent-v2",
   name: "Copy Trading Raamovereenkomst MakeMoreMoney",
-  version: "1.0",
-  date: "01-09-2026",
-  documentPath: "/documenten/copy-trading-raamovereenkomst-makemoremoney-v1.0.pdf",
+  version: "1.1",
+  date: "07-11-2026",
+  documentPath: "/documenten/copy-trading-raamovereenkomst-makemoremoney-v1.1.pdf",
   consentText:
     "Ik heb de Copy Trading Raamovereenkomst MakeMoreMoney gelezen en ga hiermee akkoord.",
 } as const;
 
 export const generalTerms = {
-  id: "general-terms-v1.0-2026-09-01",
+  id: "general-terms-v1.1-2026-11-07",
   name: "Algemene Voorwaarden MakeMoreMoney",
-  version: "1.0",
-  date: "1-9-2026",
-  path: "/algemene-voorwaarden",
+  version: "1.1",
+  date: "7-11-2026",
+  path: "/documenten/algemene-voorwaarden-makemoremoney-v1.1.pdf",
   consentText: "Ik heb de Algemene Voorwaarden MakeMoreMoney gelezen en ga hiermee akkoord.",
 } as const;
 

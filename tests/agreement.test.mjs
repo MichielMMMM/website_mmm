@@ -65,8 +65,8 @@ test("validation requires explicit consent, current document and valid fields", 
   const { salutation: omittedSalutation, ...oldInput } = validInput;
   assert.equal(omittedSalutation, "neutraal");
   assert.equal(validateAgreement(oldInput).data.salutation, "neutraal");
-  assert.equal(agreement.version, "1.0");
-  assert.equal(agreement.date, "01-09-2026");
+  assert.equal(agreement.version, "1.1");
+  assert.equal(agreement.date, "07-11-2026");
   assert.equal(agreement.consentText, "Ik heb de Copy Trading Raamovereenkomst MakeMoreMoney gelezen en ga hiermee akkoord.");
   assert.equal(validateAgreement(validInput).valid, true);
   for (const accepted of [false, undefined, "true", "on", 1, null]) {
@@ -88,7 +88,7 @@ test("validation requires explicit consent, current document and valid fields", 
     { subscriptionConsentText: "edited" }, { subscriptionVersion: "old" },
     { strategy: "unknown" }, { agreementId: "old-version" },
     { agreementId: "copy-trading-v1-2026-10-18" },
-    { agreementId: "copy-trading-v1.0-2026-09-01" },
+    { agreementId: "copy-trading-v1.0-2026-09-01" }, { agreementId: "copy-trading-v1.0-2026-09-01-consent-v2" },
     { generalTermsId: undefined }, { generalTermsId: "old" },
   ]) {
     assert.equal(validateAgreement({ ...validInput, ...fields }).valid, false);
@@ -289,7 +289,7 @@ test("built HTML has exact robots directive and no discoverable links or sitemap
     assert.match(link, /\bunderline!/);
   }
   assert.match(html, /<input(?=[^>]*name="generalTermsAccepted")(?=[^>]*required)[^>]*>/);
-  assert.match(html, /href="\/algemene-voorwaarden"[^>]*target="_blank"/);
+  assert.match(html, /href="\/documenten\/algemene-voorwaarden-makemoremoney-v1\.1\.pdf"[^>]*target="_blank"/);
   assert.equal(generalTerms.consentText, "Ik heb de Algemene Voorwaarden MakeMoreMoney gelezen en ga hiermee akkoord.");
   assert.doesNotMatch(html, /Beleggingsrekening|MEXEM-rekeningnummer|name="accountNumber"/);
   assert.doesNotMatch(html, /<p[^>]*>Versie /);
@@ -427,7 +427,7 @@ test("Hostnet notification requires TLS, follows storage and handles failures wi
       assert.ok(!message.text.includes(snapshot.subscription_consent_text));
       assert.doesNotMatch(message.text, /Documentversie:|Documentdatum:|stored-terms-version|stored-terms-date|Beste /);
       assert.match(message.html, /<ul><li><a href="https:\/\/makemoremoney.nl\/documenten\//);
-      assert.match(message.html, /<li><a href="https:\/\/makemoremoney.nl\/algemene-voorwaarden">De algemene voorwaarden van MakeMoreMoney<\/a><\/li>/);
+      assert.match(message.html, /<li><a href="https:\/\/makemoremoney.nl\/documenten\/algemene-voorwaarden-makemoremoney-v1\.1\.pdf">De algemene voorwaarden van MakeMoreMoney<\/a><\/li>/);
       assert.match(message.html, /Voorbeeld &amp; &lt;bedrijf&gt;/);
       assert.doesNotMatch(message.html, /<bedrijf>/);
       assert.equal(message.text.match(/Aantal posities:/g).length, 1);
